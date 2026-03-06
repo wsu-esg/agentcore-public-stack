@@ -1,0 +1,53 @@
+<div class="relative flex h-full flex-col w-72 border-r border-gray-300 bg-gray-100 dark:border-white/10 dark:bg-gray-900">
+    <div class="flex h-16 shrink-0 items-center justify-between px-4">
+        <img src="img/logo-light.png" alt="Boise State University Logo" class="h-12 w-auto dark:hidden" />
+        <img src="img/logo-dark.png" alt="Boise State University Logo" class="h-12 w-auto hidden dark:block" />
+        <!-- Collapse button (desktop only) -->
+        <button
+            type="button"
+            (click)="toggleCollapse()"
+            [appTooltip]="'Close sidebar'"
+            appTooltipPosition="right"
+            class="hidden lg:flex items-center justify-center size-8 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"
+            [attr.aria-label]="isCollapsed() ? 'Expand sidebar' : 'Collapse sidebar'">
+            <!-- Sidebar panel icon -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="size-6" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="16" rx="2" ry="2" />
+                <line x1="9" y1="4" x2="9" y2="20" />
+            </svg>
+        </button>
+    </div>
+
+    <div class="shrink-0 px-3 pb-3">
+        <!-- New Chat - List item style -->
+        <button
+            (click)="newSession()"
+            type="button"
+            class="group flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-left transition-colors hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-500 dark:hover:bg-white/5">
+            <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-secondary-500 text-white transition-colors group-hover:bg-secondary-400">
+                <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
+            </div>
+            <span class="text-sm/6 font-medium text-gray-700 group-hover:text-secondary-500 dark:text-gray-400 dark:group-hover:text-white">New Session</span>
+        </button>
+    </div>
+
+    <nav class="flex-1 overflow-y-auto px-3 pb-4">
+        <app-session-list></app-session-list>
+    </nav>
+
+    <!-- User dropdown fixed at bottom -->
+    @if (userService.currentUser(); as user) {
+        <div class="shrink-0 border-t border-gray-200 px-3 py-3 dark:border-white/10">
+            <app-user-dropdown [user]="user" [isAdmin]="isAdmin()" (logout)="handleLogout()"></app-user-dropdown>
+        </div>
+    }
+
+    <!-- Version display -->
+    @if (displayVersion(); as version) {
+        <div class="shrink-0 px-4 pb-2 text-center">
+            <span class="text-xs text-gray-400 dark:text-gray-500">{{ version }}</span>
+        </div>
+    }
+</div>

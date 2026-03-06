@@ -1,0 +1,21 @@
+<app-chat-container
+  [messages]="messages()"
+  [sessionId]="effectiveSessionId()"
+  [assistant]="assistant()"
+  [assistantError]="assistantError()"
+  [isChatLoading]="isChatLoading()"
+  [isLoadingSession]="showSkeleton()"
+  [streamingMessageId]="streamingMessageId()"
+  [greetingMessage]="greetingMessage()"
+  [config]="chatConfig"
+  (messageSubmitted)="onMessageSubmitted($event)"
+  (messageCancelled)="onMessageCancelled()"
+  (fileAttached)="onFileAttached($event)"
+  (settingsToggled)="toggleSettings()"
+  (assistantClosed)="closeAssistant()"
+/>
+
+<!-- Model Settings Panel -->
+<app-model-settings
+  [isOpen]="isSettingsOpen()"
+  (closed)="closeSettings()" />

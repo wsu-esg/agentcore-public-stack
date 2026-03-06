@@ -1,0 +1,299 @@
+/* You can add global styles to this file, and also import other style files */
+
+@import "tailwindcss";
+@import '@ctrl/ngx-emoji-mart/picker';
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* CDK Overlay styles - required for proper overlay positioning */
+@import "@angular/cdk/overlay-prebuilt.css";
+
+.message-block {
+
+    ul, ol {
+        margin-bottom: 1em;
+        padding-left: 2em;
+      }
+
+      ul {
+        list-style-type: disc;
+      }
+
+      ol {
+        list-style-type: decimal;
+      }
+
+      li {
+        margin-bottom: 0.5em;
+        padding-left: 0.25em;
+      }
+
+    /* Table styles with light/dark mode support */
+    table {
+        border-collapse: separate;
+        border-spacing: 0;
+        width: 100%;
+        margin-bottom: 1rem;
+        font-size: 0.875rem;
+        border: 1px solid var(--color-gray-400);
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+
+    th,
+    td {
+        border-bottom: 1px solid var(--color-gray-300);
+        border-right: 1px solid var(--color-gray-300);
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+    }
+
+    th:last-child,
+    td:last-child {
+        border-right: none;
+    }
+
+    tr:last-child td {
+        border-bottom: none;
+    }
+
+    th {
+        background-color: var(--color-gray-200);
+        font-weight: 600;
+    }
+
+    tr:nth-child(odd) td {
+        background-color: white;
+    }
+
+    tr:nth-child(even) td {
+        background-color: var(--color-gray-50);
+    }
+
+    /* Horizontal rule styles */
+    hr {
+        border: none;
+        border-top: 1px solid var(--color-gray-300);
+        margin: 1.5rem 0;
+    }
+
+    /* Header styles */
+    h1, h2, h3, h4, h5, h6 {
+        font-weight: 600;
+        line-height: 1.25;
+        margin-top: 1.5rem;
+        margin-bottom: 0.75rem;
+    }
+
+    h1 {
+        font-size: 1.875rem;
+    }
+
+    h2 {
+        font-size: 1.5rem;
+    }
+
+    h3 {
+        font-size: 1.25rem;
+    }
+
+    h4 {
+        font-size: 1.125rem;
+    }
+
+    h5 {
+        font-size: 1rem;
+    }
+
+    h6 {
+        font-size: 0.875rem;
+    }
+
+    /* Remove top margin if header is first child */
+    h1:first-child, h2:first-child, h3:first-child,
+    h4:first-child, h5:first-child, h6:first-child {
+        margin-top: 0;
+    }
+
+    /* Paragraph styles */
+    p {
+        margin-bottom: 1rem;
+        line-height: 1.625;
+    }
+
+    p:last-child {
+        margin-bottom: 0;
+    }
+
+    /* Blockquote styles */
+    blockquote {
+        border-left: 4px solid var(--color-gray-300);
+        padding-left: 1rem;
+        margin: 1rem 0;
+        font-style: italic;
+        color: var(--color-gray-600);
+    }
+
+    /* Inline code styles */
+    code:not(pre code) {
+        background-color: var(--color-gray-100);
+        color: var(--color-red-700);
+        border: 1px solid var(--color-gray-300);
+        padding: 0.125rem 0.375rem;
+        border-radius: 0.25rem;
+        font-size: 0.875em;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    /* Code block styles */
+    pre {
+        background-color: var(--color-gray-100);
+        padding: 1rem;
+        border-radius: 0.375rem;
+        overflow-x: auto;
+        margin-bottom: 1rem;
+        font-size: 0.875rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        max-width: 100%;
+    }
+
+    pre code {
+        background-color: transparent;
+        padding: 0;
+        font-size: inherit;
+    }
+
+    /* Link styles */
+    a {
+        color: var(--color-primary-500);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+    }
+
+    a:hover {
+        color: var(--color-primary-700);
+    }
+
+    /* Image styles */
+    img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 0.375rem;
+    }
+
+    /* Strong and emphasis */
+    strong {
+        font-weight: 600;
+    }
+
+    em {
+        font-style: italic;
+    }
+}
+
+/* Dark mode styles */
+html.dark .message-block {
+    /* Table */
+    table {
+        border-color: var(--color-gray-600);
+    }
+
+    th,
+    td {
+        border-color: var(--color-gray-600);
+    }
+
+    th {
+        background-color: var(--color-gray-700);
+    }
+
+    tr:nth-child(odd) td {
+        background-color: var(--color-gray-900);
+    }
+
+    tr:nth-child(even) td {
+        background-color: var(--color-gray-800);
+    }
+
+    /* Horizontal rule */
+    hr {
+        border-top-color: var(--color-gray-600);
+    }
+
+    /* Blockquote */
+    blockquote {
+        border-left-color: var(--color-gray-600);
+        color: var(--color-gray-400);
+    }
+
+    /* Inline code */
+    code:not(pre code) {
+        background-color: var(--color-gray-800);
+        color: var(--color-red-400);
+        border-color: var(--color-gray-600);
+    }
+
+    /* Code blocks */
+    pre {
+        background-color: var(--color-gray-800);
+    }
+
+    /* Links */
+    a {
+        color: var(--color-primary-400);
+    }
+
+    a:hover {
+        color: var(--color-primary-300);
+    }
+}
+  
+
+/* Ensure body has proper background for dark mode */
+body {
+    background-color: var(--color-gray-50);
+}
+
+html.dark body {
+    background-color: var(--color-gray-900);
+}
+
+@theme {
+    /* Primary color scale - #0033a0 */
+    --color-primary-50: oklch(from #0033a0 calc(l + 0.4) c h);
+    --color-primary-100: oklch(from #0033a0 calc(l + 0.35) c h);
+    --color-primary-200: oklch(from #0033a0 calc(l + 0.3) c h);
+    --color-primary-300: oklch(from #0033a0 calc(l + 0.2) c h);
+    --color-primary-400: oklch(from #0033a0 calc(l + 0.1) c h);
+    --color-primary-500: #0033a0;
+    --color-primary-600: oklch(from #0033a0 calc(l - 0.1) c h);
+    --color-primary-700: oklch(from #0033a0 calc(l - 0.15) c h);
+    --color-primary-800: oklch(from #0033a0 calc(l - 0.2) c h);
+    --color-primary-900: oklch(from #0033a0 calc(l - 0.25) c h);
+    --color-primary-950: oklch(from #0033a0 calc(l - 0.3) c h);
+
+    /* Secondary color scale - #d64309 */
+    --color-secondary-50: oklch(from #d64309 calc(l + 0.4) c h);
+    --color-secondary-100: oklch(from #d64309 calc(l + 0.35) c h);
+    --color-secondary-200: oklch(from #d64309 calc(l + 0.3) c h);
+    --color-secondary-300: oklch(from #d64309 calc(l + 0.2) c h);
+    --color-secondary-400: oklch(from #d64309 calc(l + 0.1) c h);
+    --color-secondary-500: #d64309;
+    --color-secondary-600: oklch(from #d64309 calc(l - 0.1) c h);
+    --color-secondary-700: oklch(from #d64309 calc(l - 0.15) c h);
+    --color-secondary-800: oklch(from #d64309 calc(l - 0.2) c h);
+    --color-secondary-900: oklch(from #d64309 calc(l - 0.25) c h);
+    --color-secondary-950: oklch(from #d64309 calc(l - 0.3) c h);
+
+    /* Tertiary color scale - #0072ce */
+    --color-tertiary-50: oklch(from #0072ce calc(l + 0.4) c h);
+    --color-tertiary-100: oklch(from #0072ce calc(l + 0.35) c h);
+    --color-tertiary-200: oklch(from #0072ce calc(l + 0.3) c h);
+    --color-tertiary-300: oklch(from #0072ce calc(l + 0.2) c h);
+    --color-tertiary-400: oklch(from #0072ce calc(l + 0.1) c h);
+    --color-tertiary-500: #0072ce;
+    --color-tertiary-600: oklch(from #0072ce calc(l - 0.1) c h);
+    --color-tertiary-700: oklch(from #0072ce calc(l - 0.15) c h);
+    --color-tertiary-800: oklch(from #0072ce calc(l - 0.2) c h);
+    --color-tertiary-900: oklch(from #0072ce calc(l - 0.25) c h);
+    --color-tertiary-950: oklch(from #0072ce calc(l - 0.3) c h);
+}

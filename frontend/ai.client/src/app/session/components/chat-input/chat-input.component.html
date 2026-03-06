@@ -1,0 +1,142 @@
+<!-- Cost quota warning indicator -->
+<app-quota-warning-banner />
+
+<!-- Storage quota warning indicator (only shows when files are attached) -->
+<app-storage-quota-banner [showWhenFilesAttached]="showFileAttachments()" />
+
+<div
+    class="relative rounded-2xl shadow-xl outline -outline-offset-1 transition-all duration-200"
+    [class]="isDraggingOver()
+      ? 'bg-primary-50 dark:bg-primary-900/20 outline-2 outline-dashed outline-primary-500 dark:outline-primary-400 ring-2 ring-primary-500/30 dark:ring-primary-400/30'
+      : isFocused()
+        ? 'bg-white dark:bg-slate-800 outline-2 outline-primary-500 dark:outline-gray-400 ring-2 ring-primary-500/20 dark:ring-gray-400/30 shadow-lg'
+        : 'bg-white dark:bg-slate-800 outline-1 outline-gray-300 dark:outline-white/10'"
+    (dragenter)="onDragEnter($event)"
+    (dragover)="onDragOver($event)"
+    (dragleave)="onDragLeave($event)"
+    (drop)="onDrop($event)"
+  >
+    <!-- Drop Zone Overlay -->
+    @if (isDraggingOver()) {
+      <div class="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-primary-50/90 dark:bg-primary-900/80 pointer-events-none">
+        <div class="flex flex-col items-center gap-2 text-primary-600 dark:text-primary-300">
+          <svg class="size-8" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
+          </svg>
+          <span class="text-sm font-medium">Drop files here</span>
+        </div>
+      </div>
+    }
+
+    <!-- File Attachments Area -->
+    @if (showFileAttachments()) {
+      <div class="border-b border-gray-200 dark:border-gray-700">
+        <div
+          class="flex gap-2 overflow-x-auto px-4 py-3"
+          style="mask-image: linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent); -webkit-mask-image: linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent);"
+        >
+          @for (upload of pendingUploads(); track upload.uploadId) {
+            <app-file-card
+              [pendingUpload]="upload"
+              (remove)="onFileRemove($event)"
+              (retry)="onFileRetry($event)"
+            />
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Main Input Area -->
+    <div class="relative">
+      <label for="user-message" class="sr-only">How can I help you today?</label>
+      <textarea
+        id="user-message"
+        name="user-message"
+        rows="1"
+        [value]="userInput()"
+        (input)="onTextareaInput($event)"
+        (keydown)="onKeyDown($event)"
+        (focus)="onFocus()"
+        (blur)="onBlur()"
+        placeholder="How can I help you today?"
+        class="block w-full resize-none bg-transparent px-6 py-4 text-base text-gray-900 placeholder:text-gray-500 dark:text-gray-100 dark:placeholder:text-gray-400 focus:outline-hidden overflow-hidden"
+        style="min-height: 60px; max-height: 200px;"
+      ></textarea>
+
+      <!-- Bottom Controls Bar -->
+      <div class="flex items-center justify-between px-4 pb-3">
+        <!-- Left Controls -->
+        <div class="flex items-center gap-2" role="group" aria-label="Message options">
+          @if (showFileControls()) {
+            <!-- Add Attachment Button -->
+            <div
+              class="flex size-10 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-300 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[var(--color-primary)]"
+              appTooltip="Attach file"
+              appTooltipPosition="top"
+            >
+              <input
+                type="file"
+                class="sr-only"
+                (change)="onFileSelect($event)"
+                id="file-upload"
+                [accept]="acceptedFileTypes"
+                multiple
+                aria-label="Attach a file"
+              />
+              <label for="file-upload" class="flex size-full cursor-pointer items-center justify-center">
+                <ng-icon name="heroPlus" class="size-5" aria-hidden="true" />
+              </label>
+            </div>
+
+            <!-- Settings Button -->
+            <button
+              type="button"
+              (click)="toggleSettings()"
+              class="flex size-10 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)]"
+              aria-label="Open settings"
+              appTooltip="Settings"
+              appTooltipPosition="top"
+            >
+              <ng-icon name="heroAdjustmentsHorizontal" class="size-5" aria-hidden="true" />
+            </button>
+
+            <!-- History Button -->
+            <button
+              type="button"
+              class="flex size-10 items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)]"
+              aria-label="View history"
+              appTooltip="History"
+              appTooltipPosition="top"
+            >
+              <ng-icon name="heroClock" class="size-5" aria-hidden="true" />
+            </button>
+          }
+        </div>
+
+        <!-- Right Controls -->
+        <div class="flex items-center gap-3" role="group" aria-label="Model selection and send">
+          <!-- Model Selector -->
+          <app-model-dropdown />
+
+          <!-- Submit/Stop Button -->
+          <button
+            type="button"
+            (click)="onSubmit()"
+            [disabled]="!isLoading() && hasActivePendingUploads()"
+            [class]="isLoading()
+              ? 'flex size-10 items-center justify-center rounded-full bg-red-500 text-white shadow-sm transition-all hover:bg-red-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-500'
+              : 'flex size-10 items-center justify-center rounded-full bg-secondary-500 text-white shadow-sm transition-all hover:bg-secondary-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-500 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-secondary-500'"
+            [attr.aria-label]="isLoading() ? 'Stop generation' : (hasActivePendingUploads() ? 'Upload in progress' : 'Submit message')"
+          >
+            @if (isLoading()) {
+              <!-- Stop Icon -->
+              <ng-icon name="heroStopSolid" class="size-5" aria-hidden="true" />
+            } @else {
+              <!-- Send Icon -->
+              <ng-icon name="heroPaperAirplaneSolid" class="size-5" aria-hidden="true" />
+            }
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>

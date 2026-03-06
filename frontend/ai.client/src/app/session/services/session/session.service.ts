@@ -1,0 +1,899 @@
+import { inject, Injectable, signal, WritableSignal, resource, computed, effect } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { firstValueFrom } from 'rxjs';
+import { ConfigService } from '../../../services/config.service';
+import { AuthService } from '../../../auth/auth.service';
+import { SessionMetadata, UpdateSessionMetadataRequest } from '../models/session-metadata.model';
+import { Message } from '../models/message.model';
+
+/**
+ * Query parameters for listing sessions.
+ */
+export interface ListSessionsParams {
+  /** Maximum number of sessions to return (optional, no limit if not specified, max: 1000) */
+  limit?: number;
+  /** Pagination token for retrieving the next page of results */
+  next_token?: string | null;
+}
+
+/**
+ * Response model for listing sessions with pagination support.
+ * 
+ * Matches the SessionsListResponse model from the Python API.
+ */
+export interface SessionsListResponse {
+  /** List of sessions for the user */
+  sessions: SessionMetadata[];
+  /** Pagination token for retrieving the next page of results */
+  nextToken: string | null;
+}
+
+/**
+ * Response model for listing messages with pagination support.
+ * 
+ * Matches the MessagesListResponse model from the Python API.
+ */
+export interface MessagesListResponse {
+  /** List of messages in the session */
+  messages: Message[];
+  /** Pagination token for retrieving the next page of results */
+  next_token: string | null;
+}
+
+/**
+ * Query parameters for getting messages for a session.
+ */
+export interface GetMessagesParams {
+  /** Maximum number of messages to return (optional, no limit if not specified, max: 1000) */
+  limit?: number;
+  /** Pagination token for retrieving the next page of results */
+  next_token?: string | null;
+}
+
+/**
+ * Request model for bulk deleting sessions.
+ */
+export interface BulkDeleteSessionsRequest {
+  /** List of session IDs to delete (max 20) */
+  sessionIds: string[];
+}
+
+/**
+ * Result for a single session in bulk delete operation.
+ */
+export interface BulkDeleteSessionResult {
+  /** Session identifier */
+  sessionId: string;
+  /** Whether deletion was successful */
+  success: boolean;
+  /** Error message if deletion failed */
+  error?: string;
+}
+
+/**
+ * Response model for bulk delete sessions operation.
+ */
+export interface BulkDeleteSessionsResponse {
+  /** Number of sessions successfully deleted */
+  deletedCount: number;
+  /** Number of sessions that failed to delete */
+  failedCount: number;
+  /** Individual results for each session */
+  results: BulkDeleteSessionResult[];
+}
+
+@Injectable({
+  providedIn: 'root'
+})
+export class SessionService {
+  private http = inject(HttpClient);
+  private authService = inject(AuthService);
+  private config = inject(ConfigService);
+  private readonly baseUrl = computed(() => `${this.config.appApiUrl()}/sessions`);
+
+  /**
+   * Signal representing the current active session.
+   * Initialized with default values to indicate no session is currently selected.
+   */
+  currentSession: WritableSignal<SessionMetadata> = signal<SessionMetadata>({
+    sessionId: '',
+    userId: '',
+    title: '',
+    status: 'active',
+    createdAt: '',
+    lastMessageAt: '',
+    messageCount: 0
+  });
+
+  /**
+   * Computed signal that returns true if a session is currently selected.
+   * A session is considered selected if it has a non-empty sessionId.
+   */
+  readonly hasCurrentSession = computed(() => {
+    return this.currentSession().sessionId !== '';
+  });
+
+  /**
+   * Signal for pagination parameters used by the sessions resource.
+   * Update this signal to trigger a refetch with new parameters.
+   * Angular's resource API automatically tracks signals read within the loader,
+   * so reading this signal inside the loader makes it reactive.
+   */
+  private sessionsParams = signal<ListSessionsParams>({});
+
+  /**
+   * Signal to control when the sessions resource should load.
+   * Set to true when the user is authenticated or authentication is disabled.
+   * This prevents the resource from loading before authentication is ready.
+   */
+  private sessionsRequest = signal<boolean>(false);
+
+  /**
+   * Signal to hold the local sessions cache.
+   * This allows us to optimistically update the UI without refetching from the API.
+   */
+  private localSessionsCache = signal<SessionMetadata[]>([]);
+
+  /**
+   * Signal for the session ID used by the session metadata resource.
+   * Update this signal to trigger a refetch with new session ID.
+   * Set to null to disable the resource.
+   */
+  private sessionMetadataId = signal<string | null>(null);
+
+  /**
+   * Set of session IDs that are known to be new (not yet saved to backend).
+   * Used to skip unnecessary metadata fetches for brand new sessions.
+   */
+  private newSessionIds = new Set<string>();
+
+  /**
+   * Reactive resource for fetching sessions.
+   *
+   * This resource automatically refetches when `sessionsParams` or `sessionsRequest` signals change
+   * because Angular's resource API tracks signals read within the loader function.
+   * Provides reactive signals for data, loading state, and errors.
+   *
+   * The resource ensures the user is authenticated before making the HTTP request.
+   * If the token is expired, it will attempt to refresh it automatically.
+   *
+   * The resource will not load until `enableSessionsLoading()` is called, which should be done
+   * after authentication is ready or when authentication is disabled.
+   *
+   * Returns SessionsListResponse which includes both the sessions array and pagination token.
+   *
+   * Benefits of Angular's resource API:
+   * - Automatic refetch when tracked signals change
+   * - Built-in request cancellation if loader is called again before completion
+   * - Seamless integration with Angular's reactivity system
+   *
+   * @example
+   * ```typescript
+   * // Enable loading (typically done after authentication)
+   * sessionService.enableSessionsLoading();
+   *
+   * // Access data (may be undefined initially)
+   * const response = sessionService.sessionsResource.value();
+   * const sessions = response?.sessions;
+   * const nextToken = response?.next_token;
+   *
+   * // Check loading state
+   * const isLoading = sessionService.sessionsResource.isPending();
+   *
+   * // Handle errors
+   * const error = sessionService.sessionsResource.error();
+   *
+   * // Update pagination to trigger refetch
+   * sessionService.updateSessionsParams({ limit: 50 });
+   *
+   * // Get next page
+   * sessionService.updateSessionsParams({ limit: 50, next_token: nextToken });
+   *
+   * // Manually refetch
+   * sessionService.sessionsResource.refetch();
+   * ```
+   */
+  readonly sessionsResource = resource({
+    loader: async () => {
+      // Don't load until explicitly enabled
+      if (!this.sessionsRequest()) {
+        return null;
+      }
+
+      // Read params signal to make resource reactive to pagination changes
+      const params = this.sessionsParams();
+
+      // Ensure user is authenticated before making the request
+      await this.authService.ensureAuthenticated();
+
+      // Fetch sessions from API (without merging cache here)
+      return this.getSessions(params);
+    }
+  });
+
+  /**
+   * Computed signal that merges API sessions with local cache.
+   * This automatically updates whenever either the resource data or local cache changes.
+   */
+  readonly mergedSessionsResource = computed(() => {
+    const apiResponse = this.sessionsResource.value();
+    const localCache = this.localSessionsCache();
+
+    if (!apiResponse || apiResponse === null) {
+      // Resource hasn't loaded yet or is disabled, return cached sessions only
+      return {
+        sessions: localCache,
+        nextToken: null
+      };
+    }
+
+    // Merge local cache with API data
+    const mergedSessions = this.mergeSessions(localCache, apiResponse.sessions);
+
+    return {
+      ...apiResponse,
+      sessions: mergedSessions
+    };
+  });
+
+  /**
+   * Enables the sessions resource to start loading.
+   * This should be called after authentication is ready or when authentication is disabled.
+   * Once enabled, the resource will automatically fetch sessions and refetch when signals change.
+   *
+   * @example
+   * ```typescript
+   * // In a component or guard after user logs in
+   * sessionService.enableSessionsLoading();
+   * ```
+   */
+  enableSessionsLoading(): void {
+    const wasDisabled = !this.sessionsRequest();
+    this.sessionsRequest.set(true);
+
+    // If we're transitioning from disabled to enabled, trigger a reload
+    // This ensures the resource fetches data immediately after authentication
+    if (wasDisabled) {
+      this.sessionsResource.reload();
+    }
+  }
+
+  /**
+   * Disables the sessions resource from loading.
+   * Useful when the user logs out or when you want to prevent unnecessary API calls.
+   */
+  disableSessionsLoading(): void {
+    this.sessionsRequest.set(false);
+  }
+
+  /**
+   * Updates the pagination parameters for the sessions resource.
+   * This will automatically trigger a refetch of the resource.
+   *
+   * @param params - New pagination parameters
+   */
+  updateSessionsParams(params: Partial<ListSessionsParams>): void {
+    this.sessionsParams.update(current => ({ ...current, ...params }));
+  }
+
+  /**
+   * Resets pagination parameters to default values and triggers a refetch.
+   */
+  resetSessionsParams(): void {
+    this.sessionsParams.set({});
+  }
+
+  /**
+   * Reactive resource for fetching session metadata.
+   * 
+   * This resource automatically refetches when `sessionMetadataId` signal changes.
+   * Set the session ID using `setSessionMetadataId()` to fetch metadata for a specific session.
+   * Set to null to disable the resource.
+   * 
+   * The resource ensures the user is authenticated before making the HTTP request.
+   * 
+   * @example
+   * ```typescript
+   * // Fetch metadata for a session
+   * sessionService.setSessionMetadataId('session-id-123');
+   * 
+   * // Access data
+   * const metadata = sessionService.sessionMetadataResource.value();
+   * 
+   * // Check loading state
+   * const isLoading = sessionService.sessionMetadataResource.isPending();
+   * 
+   * // Manually refetch
+   * sessionService.sessionMetadataResource.refetch();
+   * 
+   * // Disable resource
+   * sessionService.setSessionMetadataId(null);
+   * ```
+   */
+  readonly sessionMetadataResource = resource({
+    loader: async () => {
+      // Reading this signal inside the loader makes the resource reactive to its changes
+      // Angular's resource API automatically tracks signal dependencies
+      const sessionId = this.sessionMetadataId();
+
+      // If no session ID, return null
+      if (!sessionId) {
+        return null;
+      }
+
+      // Skip API call for new sessions that haven't been saved yet
+      if (this.newSessionIds.has(sessionId)) {
+        return null;
+      }
+
+      // Ensure user is authenticated before making the request
+      await this.authService.ensureAuthenticated();
+
+      return this.getSessionMetadata(sessionId);
+    }
+  });
+
+  /**
+   * Sets the session ID for the metadata resource.
+   * This will automatically trigger a refetch of the resource.
+   * Set to null to disable the resource.
+   *
+   * @param sessionId - Session ID to fetch metadata for, or null to disable
+   */
+  setSessionMetadataId(sessionId: string | null): void {
+    this.sessionMetadataId.set(sessionId);
+  }
+
+  /**
+   * Checks if a session is new (not yet saved to backend).
+   *
+   * @param sessionId - The session ID to check
+   * @returns true if the session is new, false otherwise
+   */
+  isNewSession(sessionId: string): boolean {
+    return this.newSessionIds.has(sessionId);
+  }
+
+  /**
+   * Fetches a list of sessions from the Python API with pagination support.
+   * 
+   * @param params - Optional query parameters for pagination
+   * @returns Promise resolving to SessionsListResponse with sessions and pagination token
+   * @throws Error if the API request fails
+   * 
+   * @example
+   * ```typescript
+   * // Get first page of sessions
+   * const response = await sessionService.getSessions({ limit: 20 });
+   * 
+   * // Get next page
+   * const nextPage = await sessionService.getSessions({
+   *   limit: 20,
+   *   next_token: response.next_token
+   * });
+   * ```
+   */
+  async getSessions(params?: ListSessionsParams): Promise<SessionsListResponse> {
+    let httpParams = new HttpParams();
+    
+    if (params?.limit !== undefined) {
+      httpParams = httpParams.set('limit', params.limit.toString());
+    }
+    
+    if (params?.next_token) {
+      httpParams = httpParams.set('next_token', params.next_token);
+    }
+
+    try {
+      const response = await firstValueFrom(
+        this.http.get<SessionsListResponse>(
+          this.baseUrl(),
+          { params: httpParams }
+        )
+      );
+
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Fetches messages for a specific session from the Python API.
+   * 
+   * @param sessionId - UUID of the session
+   * @param params - Optional query parameters for pagination
+   * @returns Promise resolving to MessagesListResponse with messages and pagination token
+   * @throws Error if the API request fails
+   * 
+   * @example
+   * ```typescript
+   * // Get first page of messages
+   * const response = await sessionService.getMessages(
+   *   '8e70ae89-93af-4db7-ba60-f13ea201f4cd',
+   *   { limit: 20 }
+   * );
+   * 
+   * // Get next page
+   * const nextPage = await sessionService.getMessages(
+   *   '8e70ae89-93af-4db7-ba60-f13ea201f4cd',
+   *   { limit: 20, next_token: response.next_token }
+   * );
+   * ```
+   */
+  async getMessages(sessionId: string, params?: GetMessagesParams): Promise<MessagesListResponse> {
+    let httpParams = new HttpParams();
+    
+    if (params?.limit !== undefined) {
+      httpParams = httpParams.set('limit', params.limit.toString());
+    }
+    
+    if (params?.next_token) {
+      httpParams = httpParams.set('next_token', params.next_token);
+    }
+
+    try {
+      const response = await firstValueFrom(
+        this.http.get<MessagesListResponse>(
+          `${this.baseUrl()}/${sessionId}/messages`,
+          { params: httpParams }
+        )
+      );
+
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Fetches metadata for a specific session from the Python API.
+   * 
+   * @param sessionId - UUID of the session
+   * @returns Promise resolving to SessionMetadata object
+   * @throws Error if the API request fails
+   * 
+   * @example
+   * ```typescript
+   * const metadata = await sessionService.getSessionMetadata(
+   *   '8e70ae89-93af-4db7-ba60-f13ea201f4cd'
+   * );
+   * ```
+   */
+  async getSessionMetadata(sessionId: string): Promise<SessionMetadata> {
+    // Ensure user is authenticated before making the request
+    await this.authService.ensureAuthenticated();
+
+    try {
+      const response = await firstValueFrom(
+        this.http.get<SessionMetadata>(
+          `${this.baseUrl()}/${sessionId}/metadata`
+        )
+      );
+
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Updates session metadata.
+   * Performs a deep merge - only updates fields that are provided.
+   * 
+   * @param sessionId - UUID of the session
+   * @param updates - Partial metadata updates
+   * @returns Promise resolving to updated SessionMetadata object
+   * @throws Error if the API request fails
+   * 
+   * @example
+   * ```typescript
+   * const updated = await sessionService.updateSessionMetadata(
+   *   '8e70ae89-93af-4db7-ba60-f13ea201f4cd',
+   *   { title: 'New Title', starred: true }
+   * );
+   * ```
+   */
+  async updateSessionMetadata(
+    sessionId: string,
+    updates: UpdateSessionMetadataRequest
+  ): Promise<SessionMetadata> {
+    // Ensure user is authenticated before making the request
+    await this.authService.ensureAuthenticated();
+
+    try {
+      const response = await firstValueFrom(
+        this.http.put<SessionMetadata>(
+          `${this.baseUrl()}/${sessionId}/metadata`,
+          updates
+        )
+      );
+
+      // If this is the current session, update the currentSession signal
+      if (this.currentSession().sessionId === sessionId) {
+        this.currentSession.update(current => ({ ...current, ...response }));
+      }
+
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Updates the title of a session.
+   * 
+   * @param sessionId - UUID of the session
+   * @param title - New title for the session
+   * @returns Promise resolving to updated SessionMetadata object
+   * @throws Error if the API request fails
+   */
+  async updateSessionTitle(sessionId: string, title: string): Promise<SessionMetadata> {
+    return this.updateSessionMetadata(sessionId, { title });
+  }
+
+  /**
+   * Toggles the starred status of a session.
+   * 
+   * @param sessionId - UUID of the session
+   * @param starred - Starred status
+   * @returns Promise resolving to updated SessionMetadata object
+   * @throws Error if the API request fails
+   */
+  async toggleStarred(sessionId: string, starred: boolean): Promise<SessionMetadata> {
+    return this.updateSessionMetadata(sessionId, { starred });
+  }
+
+  /**
+   * Updates the tags for a session.
+   * 
+   * @param sessionId - UUID of the session
+   * @param tags - Array of tags
+   * @returns Promise resolving to updated SessionMetadata object
+   * @throws Error if the API request fails
+   */
+  async updateSessionTags(sessionId: string, tags: string[]): Promise<SessionMetadata> {
+    return this.updateSessionMetadata(sessionId, { tags });
+  }
+
+  /**
+   * Updates the status of a session.
+   * 
+   * @param sessionId - UUID of the session
+   * @param status - Session status ('active' | 'archived' | 'deleted')
+   * @returns Promise resolving to updated SessionMetadata object
+   * @throws Error if the API request fails
+   */
+  async updateSessionStatus(
+    sessionId: string,
+    status: 'active' | 'archived' | 'deleted'
+  ): Promise<SessionMetadata> {
+    return this.updateSessionMetadata(sessionId, { status });
+  }
+
+  /**
+   * Updates session preferences.
+   *
+   * @param sessionId - UUID of the session
+   * @param preferences - Session preferences to update
+   * @returns Promise resolving to updated SessionMetadata object
+   * @throws Error if the API request fails
+   */
+  async updateSessionPreferences(
+    sessionId: string,
+    preferences: {
+      lastModel?: string;
+      lastTemperature?: number;
+      enabledTools?: string[];
+      selectedPromptId?: string;
+      customPromptText?: string;
+    }
+  ): Promise<SessionMetadata> {
+    return this.updateSessionMetadata(sessionId, preferences);
+  }
+
+  /**
+   * Deletes a session (soft delete).
+   * The session metadata is marked as deleted but cost records are preserved for billing/audit.
+   *
+   * @param sessionId - UUID of the session to delete
+   * @returns Promise that resolves when deletion is complete
+   * @throws Error if the API request fails (404 if not found, 500 for server errors)
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   await sessionService.deleteSession('8e70ae89-93af-4db7-ba60-f13ea201f4cd');
+   *   console.log('Session deleted successfully');
+   * } catch (error) {
+   *   console.error('Failed to delete session:', error);
+   * }
+   * ```
+   */
+  async deleteSession(sessionId: string): Promise<void> {
+    // Ensure user is authenticated before making the request
+    await this.authService.ensureAuthenticated();
+
+    try {
+      await firstValueFrom(
+        this.http.delete(`${this.baseUrl()}/${sessionId}`)
+      );
+
+      // Remove from new session IDs set if present
+      this.newSessionIds.delete(sessionId);
+
+      // Optimistically remove from local cache
+      this.localSessionsCache.update(sessions =>
+        sessions.filter(s => s.sessionId !== sessionId)
+      );
+
+      // Clear current session if we just deleted it
+      if (this.currentSession().sessionId === sessionId) {
+        this.currentSession.set({
+          sessionId: '',
+          userId: '',
+          title: '',
+          status: 'active',
+          createdAt: '',
+          lastMessageAt: '',
+          messageCount: 0
+        });
+      }
+
+      // Trigger sessions resource reload to ensure UI is in sync with backend
+      this.sessionsResource.reload();
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Bulk delete multiple sessions.
+   * Deletes up to 20 sessions at once. Sessions are soft-deleted and cost records
+   * are preserved for billing/audit purposes.
+   *
+   * @param sessionIds - Array of session IDs to delete (max 20)
+   * @returns Promise resolving to BulkDeleteSessionsResponse with individual results
+   * @throws Error if the API request fails
+   *
+   * @example
+   * ```typescript
+   * try {
+   *   const result = await sessionService.bulkDeleteSessions([
+   *     'session-1',
+   *     'session-2',
+   *     'session-3'
+   *   ]);
+   *   console.log(`Deleted ${result.deletedCount} sessions`);
+   *   if (result.failedCount > 0) {
+   *     console.warn(`Failed to delete ${result.failedCount} sessions`);
+   *   }
+   * } catch (error) {
+   *   console.error('Bulk delete failed:', error);
+   * }
+   * ```
+   */
+  async bulkDeleteSessions(sessionIds: string[]): Promise<BulkDeleteSessionsResponse> {
+    // Ensure user is authenticated before making the request
+    await this.authService.ensureAuthenticated();
+
+    try {
+      const response = await firstValueFrom(
+        this.http.post<BulkDeleteSessionsResponse>(
+          `${this.baseUrl()}/bulk-delete`,
+          { sessionIds } as BulkDeleteSessionsRequest
+        )
+      );
+
+      // Remove successfully deleted sessions from new session IDs set
+      for (const result of response.results) {
+        if (result.success) {
+          this.newSessionIds.delete(result.sessionId);
+        }
+      }
+
+      // Optimistically remove successfully deleted sessions from local cache
+      const deletedIds = new Set(
+        response.results
+          .filter(r => r.success)
+          .map(r => r.sessionId)
+      );
+
+      this.localSessionsCache.update(sessions =>
+        sessions.filter(s => !deletedIds.has(s.sessionId))
+      );
+
+      // Clear current session if it was deleted
+      if (deletedIds.has(this.currentSession().sessionId)) {
+        this.currentSession.set({
+          sessionId: '',
+          userId: '',
+          title: '',
+          status: 'active',
+          createdAt: '',
+          lastMessageAt: '',
+          messageCount: 0
+        });
+      }
+
+      // Trigger sessions resource reload to ensure UI is in sync with backend
+      this.sessionsResource.reload();
+
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Adds a new session to the local cache optimistically.
+   * This allows the UI to update immediately without waiting for an API refetch.
+   * The session will appear at the top of the list until the next API refresh.
+   *
+   * @param sessionId - The session ID
+   * @param userId - The user ID
+   * @param title - Optional title for the session (defaults to empty string)
+   *
+   * @example
+   * ```typescript
+   * // When creating a new session
+   * sessionService.addSessionToCache('new-session-id', 'user-123');
+   * ```
+   */
+  addSessionToCache(sessionId: string, userId: string, title: string = ''): void {
+    const newSession: SessionMetadata = {
+      sessionId,
+      userId,
+      title,
+      status: 'active',
+      createdAt: new Date().toISOString(),
+      lastMessageAt: new Date().toISOString(),
+      messageCount: 0
+    };
+
+    // Mark this session as new to skip metadata fetches
+    this.newSessionIds.add(sessionId);
+
+    // Add to local cache (will be merged with API data on next load)
+    this.localSessionsCache.update(sessions => {
+      return [newSession, ...sessions];
+    });
+  }
+
+  /**
+   * Merges local cache sessions with API sessions.
+   * Local cache sessions take precedence and appear first.
+   * Deduplicates by sessionId (local cache wins).
+   *
+   * @param localSessions - Sessions from local cache (optimistic updates)
+   * @param apiSessions - Sessions from API
+   * @returns Merged and deduplicated session list
+   */
+  private mergeSessions(localSessions: SessionMetadata[], apiSessions: SessionMetadata[]): SessionMetadata[] {
+    // If no local sessions, just return API sessions
+    if (localSessions.length === 0) {
+      return apiSessions;
+    }
+
+    // Create a Set of local session IDs for deduplication
+    const localSessionIds = new Set(localSessions.map(s => s.sessionId));
+
+    // Filter out API sessions that are already in local cache
+    const uniqueApiSessions = apiSessions.filter(s => !localSessionIds.has(s.sessionId));
+
+    // Return local sessions first (most recent), then unique API sessions
+    return [...localSessions, ...uniqueApiSessions];
+  }
+
+  /**
+   * Updates the title of a session in the local cache.
+   * This allows the UI to update immediately without waiting for an API refetch.
+   *
+   * @param sessionId - The session ID to update
+   * @param title - The new title for the session
+   *
+   * @example
+   * ```typescript
+   * // Update session title in cache
+   * sessionService.updateSessionTitleInCache('session-id-123', 'New Title');
+   * ```
+   */
+  updateSessionTitleInCache(sessionId: string, title: string): void {
+    // Remove from new sessions set since the title is generated after session creation
+    // This indicates the session now exists in the backend
+    this.newSessionIds.delete(sessionId);
+
+    this.localSessionsCache.update(sessions => {
+      return sessions.map(session =>
+        session.sessionId === sessionId
+          ? { ...session, title }
+          : session
+      );
+    });
+  }
+
+
+  /**
+   * Clears the local session cache.
+   * Useful when you want to force a full refresh from the API.
+   */
+  clearSessionCache(): void {
+    this.localSessionsCache.set([]);
+  }
+
+  constructor() {
+    // Enable sessions loading if user is already authenticated
+    // This prevents the resource from loading before authentication is ready
+    if (this.authService.isAuthenticated()) {
+      this.enableSessionsLoading();
+    }
+
+    // Listen for authentication state changes
+    if (typeof window !== 'undefined') {
+      // Listen for token-stored events (user logged in)
+      window.addEventListener('token-stored', () => {
+        this.enableSessionsLoading();
+      });
+
+      // Listen for token-cleared events (user logged out)
+      window.addEventListener('token-cleared', () => {
+        this.disableSessionsLoading();
+        this.clearSessionCache();
+      });
+    }
+
+    // Effect to trigger resource reload when session ID changes
+    effect(() => {
+      const id = this.sessionMetadataId();
+
+      if (id) {
+        // Check if this is a new session (in cache but not in backend yet)
+        if (this.newSessionIds.has(id)) {
+          // For new sessions, get metadata from local cache
+          const cachedSession = this.localSessionsCache().find(s => s.sessionId === id);
+          if (cachedSession) {
+            this.currentSession.set(cachedSession);
+          }
+        } else {
+          // For existing sessions, fetch from API
+          this.sessionMetadataResource.reload();
+        }
+      } else {
+        // Clear current session when no session is selected
+        this.currentSession.set({
+          sessionId: '',
+          userId: '',
+          title: '',
+          status: 'active',
+          createdAt: '',
+          lastMessageAt: '',
+          messageCount: 0
+        });
+      }
+    });
+
+    // Effect to sync sessionMetadataResource with currentSession signal
+    effect(() => {
+      const metadata = this.sessionMetadataResource.value();
+
+      if (metadata && typeof metadata === 'object' && 'sessionId' in metadata) {
+        this.currentSession.set(metadata);
+      }
+    });
+
+    // Effect to sync title updates from cache to currentSession
+    effect(() => {
+      const cache = this.localSessionsCache();
+      const currentSessionId = this.currentSession().sessionId;
+
+      // If we have a current session, check if its title was updated in the cache
+      if (currentSessionId && this.newSessionIds.has(currentSessionId)) {
+        const cachedSession = cache.find(s => s.sessionId === currentSessionId);
+        if (cachedSession && cachedSession.title !== this.currentSession().title) {
+          this.currentSession.set(cachedSession);
+        }
+      }
+    });
+  }
+}
+

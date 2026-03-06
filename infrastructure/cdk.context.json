@@ -1,0 +1,85 @@
+{
+  "@aws-cdk/core:defaultStackSynthesizer": "VersionedStackSynthesizerCloudAssemblyContext",
+  "@aws-cdk/core:enableAssetManifest": true,
+  "@aws-cdk/core:checksumAssetForResourceTags": true,
+  "production": true,
+  "retainDataOnDelete": false,
+  "projectPrefix": "agentcore",
+  "awsAccount": "",
+  "awsRegion": "us-west-2",
+  "vpcCidr": "10.0.0.0/16",
+  "corsOrigins": "http://localhost:4200,http://localhost:8000",
+  "domainName": "",
+  "infrastructureHostedZoneDomain": "",
+  "albSubdomain": "",
+  "certificateArn": "",
+  "imageTag": "",
+  "frontend": {
+    "certificateArn": "",
+    "enabled": true,
+    "bucketName": "",
+    "cloudFrontPriceClass": "PriceClass_100"
+  },
+  "appApi": {
+    "enabled": true,
+    "cpu": 512,
+    "memory": 1024,
+    "desiredCount": 1,
+    "maxCapacity": 10
+  },
+  "inferenceApi": {
+    "enabled": true,
+    "cpu": 1024,
+    "memory": 2048,
+    "desiredCount": 1,
+    "maxCapacity": 5,
+    "logLevel": "INFO",
+    "corsOrigins": "",
+    "tavilyApiKey": "",
+    "novaActApiKey": ""
+  },
+  "gateway": {
+    "enabled": true,
+    "apiType": "HTTP",
+    "throttleRateLimit": 10000,
+    "throttleBurstLimit": 5000,
+    "enableWaf": false,
+    "logLevel": "INFO"
+  },
+  "fileUpload": {
+    "enabled": true,
+    "maxFileSizeBytes": 4194304,
+    "maxFilesPerMessage": 5,
+    "userQuotaBytes": 1073741824,
+    "retentionDays": 365
+  },
+  "assistants": {
+    "enabled": true
+  },
+  "ragIngestion": {
+    "enabled": true,
+    "lambdaMemorySize": 3008,
+    "lambdaTimeout": 900,
+    "embeddingModel": "amazon.titan-embed-text-v2",
+    "vectorDimension": 1024,
+    "vectorDistanceMetric": "cosine"
+  },
+  "tags": {
+    "ManagedBy": "CDK"
+  },
+  "availability-zones:account=490617140655:region=us-west-2": [
+    "us-west-2a",
+    "us-west-2b",
+    "us-west-2c",
+    "us-west-2d"
+  ],
+  "acknowledged-issue-numbers": [
+    34892
+  ],
+  "availability-zones:account=029812070295:region=us-west-2": [
+    "us-west-2a",
+    "us-west-2b",
+    "us-west-2c",
+    "us-west-2d"
+  ]
+}

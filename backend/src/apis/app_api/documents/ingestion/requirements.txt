@@ -1,0 +1,24 @@
+# Lambda deployment requirements for document ingestion pipeline
+#
+# This file is used for packaging the Lambda function.
+# It includes only the dependencies needed for the Lambda runtime.
+#
+# To build Lambda package:
+#   pip install -r requirements.txt -t ./package
+#   zip -r lambda-package.zip package/
+
+# NumPy and SciPy - AL2023 has glibc 2.34 so modern wheels work fine
+numpy
+scipy
+
+# AWS SDK (already in Lambda runtime, but pinning for consistency)
+boto3>=1.40.1
+
+# Document processing libraries
+# transformers 4.45+ has RTDetrImageProcessor needed by docling
+# We install torch 2.5.1 CPU explicitly in Dockerfile before this
+transformers>=4.45.0  # Required for RTDetrImageProcessor used by docling
+docling>=1.0.0  # Core Docling library for PDF, DOCX, PPTX, TXT, MD, RTF processing
+docling-core[chunking-openai]  # Chunking with OpenAI tokenizer
+tiktoken>=0.5.0  # Text chunking and tokenization
+striprtf>=0.0.29  # RTF to text conversion

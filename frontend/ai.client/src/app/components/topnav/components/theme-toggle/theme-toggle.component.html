@@ -1,0 +1,59 @@
+<div class="relative">
+  <button
+    type="button"
+    (click)="toggleMenu()"
+    (keydown)="handleKeydown($event)"
+    class="-m-2.5 p-2.5 text-gray-400 hover:text-gray-500 dark:hover:text-white"
+    [attr.aria-expanded]="isOpen()"
+    aria-haspopup="true"
+    aria-controls="theme-menu"
+    aria-label="Theme menu">
+    <span class="sr-only">Toggle theme</span>
+    
+    @if (currentTheme() === 'light') {
+      <!-- Sun icon for light mode -->
+      <ng-icon name="heroSun" class="size-6" />
+    } @else {
+      <!-- Moon icon for dark mode -->
+      <ng-icon name="heroMoon" class="size-6" />
+    }
+  </button>
+
+  @if (isOpen()) {
+    <div 
+      id="theme-menu"
+      class="absolute right-0 z-10 mt-2 w-36 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black/5 dark:bg-gray-800 dark:ring-white/10"
+      (keydown)="handleKeydown($event)">
+      <div class="py-1" role="menu" aria-orientation="vertical">
+        <button
+          type="button"
+          (click)="selectTheme('light')"
+          [class]="'flex w-full items-center gap-x-3 px-4 py-2 text-sm/6 hover:bg-gray-50 dark:hover:bg-gray-700 ' +
+                   (currentPreference() === 'light' ? 'font-semibold text-[var(--color-primary)]' : 'text-gray-700 dark:text-gray-300')"
+          role="menuitem">
+          <ng-icon name="heroSun" class="size-5" />
+          Light
+        </button>
+        <button
+          type="button"
+          (click)="selectTheme('dark')"
+          [class]="'flex w-full items-center gap-x-3 px-4 py-2 text-sm/6 hover:bg-gray-50 dark:hover:bg-gray-700 ' +
+                   (currentPreference() === 'dark' ? 'font-semibold text-[var(--color-primary)]' : 'text-gray-700 dark:text-gray-300')"
+          role="menuitem">
+          <ng-icon name="heroMoon" class="size-5" />
+          Dark
+        </button>
+        <button
+          type="button"
+          (click)="selectTheme('system')"
+          [class]="'flex w-full items-center gap-x-3 px-4 py-2 text-sm/6 hover:bg-gray-50 dark:hover:bg-gray-700 ' +
+                   (currentPreference() === 'system' ? 'font-semibold text-[var(--color-primary)]' : 'text-gray-700 dark:text-gray-300')"
+          role="menuitem">
+          <ng-icon name="heroComputerDesktop" class="size-5" />
+          System
+        </button>
+      </div>
+    </div>
+  }
+</div>
+

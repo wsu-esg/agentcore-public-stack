@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Mobile sidenav animations */
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.sidenav-panel-enter {
+  animation: slideIn 0.3s ease-out forwards;
+}
+
+.sidenav-panel-exit {
+  animation: slideOut 0.3s ease-in forwards;
+}
+
+.sidenav-backdrop-enter {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.sidenav-backdrop-exit {
+  animation: fadeOut 0.3s ease-in forwards;
+}

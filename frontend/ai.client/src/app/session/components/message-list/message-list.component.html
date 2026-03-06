@@ -1,0 +1,56 @@
+<div class="space-y-6">
+  <!-- Debug: Show JSON -->
+  <!-- <details class="rounded-sm border border-gray-300 bg-gray-50 p-2 dark:border-gray-700 dark:bg-gray-800">
+    <summary class="cursor-pointer text-sm font-semibold">Debug: View Messages JSON</summary>
+    <pre class="mt-2 overflow-x-auto text-xs">{{ messages() | json }}</pre>
+  </details> -->
+
+  @for (message of messages(); track message.id; let i = $index) {
+    @if (message.role === 'user') {
+      <div [attr.id]="'message-' + message.id">
+        <app-user-message [message]="message"></app-user-message>
+      </div>
+    } @else {
+        <div
+          class="group relative min-w-0"
+          role="group"
+          aria-label="Assistant message with metadata">
+            <div class="rounded-2xl bg-gray-50 px-4 py-3 text-base/6 text-gray-800 dark:bg-gray-900 dark:text-gray-200 overflow-hidden">
+                <app-assistant-message class="min-w-0 block" [message]="message" [isStreaming]="message.id === streamingMessageId()"></app-assistant-message>
+            </div>
+            <div class="invisible mt-2 flex flex-wrap items-center gap-2 opacity-0 transition-opacity duration-200 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100" aria-live="polite" aria-atomic="true">
+                @if (message.metadata) {
+                    <app-message-metadata-badges [metadata]="message.metadata"></app-message-metadata-badges>
+                }
+                @if (message.citations && message.citations.length > 0) {
+                    <app-citation-display [citations]="message.citations"></app-citation-display>
+                }
+            </div>
+        </div>
+    }
+  }
+
+  <!-- Loading indicator -->
+  @if (isChatLoading()) {
+    <div class="py-4">
+      <app-pulsating-loader />
+    </div>
+  }
+
+  
+  @if (messages().length === 0) {
+    <div class="py-12 text-center text-gray-500 dark:text-gray-400">
+      <p class="text-lg">No messages yet</p>
+      <p class="text-sm">Start a conversation to see messages here</p>
+    </div>
+  }
+
+  <!-- Spacer div to create scrollable space at the bottom -->
+  @if (messages().length > 0) {
+    <div
+      aria-hidden="true"
+      [style.height.px]="spacerHeight()"
+      class="pointer-events-none">
+    </div>
+  }
+</div>

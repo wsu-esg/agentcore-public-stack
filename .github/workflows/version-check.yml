@@ -1,0 +1,58 @@
+name: "Version Check"
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  version-check:
+    name: Version Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fetch main branch
+        run: |
+          git fetch origin main
+
+      - name: Check version was bumped
+        id: version-bumped
+        continue-on-error: true
+        run: |
+          DIFF=$(git diff origin/main -- VERSION)
+          if [ -z "${DIFF}" ]; then
+            echo "::error::VERSION file has not been updated. Bump the version before merging to main."
+            exit 1
+          fi
+          echo "VERSION file has been updated."
+
+      - name: Check manifests are in sync
+        id: manifests-synced
+        continue-on-error: true
+        run: |
+          bash scripts/common/sync-version.sh --check
+
+      - name: Evaluate results
+        run: |
+          FAILED=0
+
+          if [ "${{ steps.version-bumped.outcome }}" = "failure" ]; then
+            echo "::error::VERSION file has not been updated. Bump the version before merging to main."
+            FAILED=1
+          fi
+
+          if [ "${{ steps.manifests-synced.outcome }}" = "failure" ]; then
+            echo "::error::Package manifests are out of sync with VERSION. Run \`bash scripts/common/sync-version.sh\` and commit."
+            FAILED=1
+          fi
+
+          if [ "${FAILED}" -eq 1 ]; then
+            exit 1
+          fi
+
+          echo "All version checks passed."

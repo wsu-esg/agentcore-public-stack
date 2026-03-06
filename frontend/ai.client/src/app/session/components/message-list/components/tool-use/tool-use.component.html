@@ -1,0 +1,275 @@
+@if (minimized()) {
+  <!-- Minimized view - compact single line for promoted visuals -->
+  <div class="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-500 dark:text-gray-400
+              bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+    <!-- Status icon -->
+    @switch (toolStatus()) {
+      @case ('complete') {
+        <svg
+          class="size-4 text-green-600 dark:text-green-400 shrink-0"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2.5"
+            d="M5 13l4 4L19 7"
+          />
+        </svg>
+      }
+      @case ('error') {
+        <svg
+          class="size-4 text-red-600 dark:text-red-400 shrink-0"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2.5"
+            d="M6 18L18 6M6 6l12 12"
+          />
+        </svg>
+      }
+      @default {
+        <svg
+          class="size-4 text-gray-400 dark:text-gray-500 animate-spin shrink-0"
+          fill="none"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <circle
+            class="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            stroke-width="3"
+          />
+          <path
+            class="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          />
+        </svg>
+      }
+    }
+
+    <span class="font-medium text-gray-700 dark:text-gray-300">{{ toolName() }}</span>
+
+    <button
+      type="button"
+      (click)="toggleDetailsExpanded()"
+      class="text-xs text-blue-600 dark:text-blue-400 hover:underline ml-auto"
+    >
+      {{ isDetailsExpanded() ? 'Hide details' : 'Show details' }}
+    </button>
+  </div>
+
+  <!-- Expandable details for minimized mode -->
+  <div class="collapsible-content mt-2" [class.open]="isDetailsExpanded()">
+    <div class="space-y-2 pl-6">
+      <!-- Input section -->
+      @if (hasInput()) {
+        <div>
+          <div class="text-xs/5 font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Input
+          </div>
+          <pre
+            class="p-2 bg-gray-100 dark:bg-gray-800 rounded-xs font-mono text-xs overflow-x-auto border border-gray-300 dark:border-gray-600"
+          ><code [innerHTML]="formattedJson() | jsonSyntaxHighlight"></code></pre>
+        </div>
+      }
+
+      <!-- Result section -->
+      @if (hasResult()) {
+        <div>
+          <div class="text-xs/5 font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1.5">
+            <span>Output</span>
+            @if (toolResult()?.status === 'error') {
+              <span class="text-red-600 dark:text-red-400">(Error)</span>
+            }
+          </div>
+          <div class="space-y-2">
+            @for (item of resultTextContent(); track $index) {
+              <div class="p-2 bg-gray-100 dark:bg-gray-800 rounded-xs border border-gray-300 dark:border-gray-600">
+                @if (item.json) {
+                  <pre class="font-mono text-xs overflow-x-auto"><code [innerHTML]="formatResultContent(item) | jsonSyntaxHighlight"></code></pre>
+                } @else {
+                  <div class="text-sm/6 text-gray-900 dark:text-gray-100 whitespace-pre-wrap">{{ formatResultContent(item) }}</div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+  </div>
+} @else {
+  <!-- Full view - original implementation -->
+  <!-- Gradient border wrapper -->
+  <div class="gradient-border rounded-lg"
+  [class.gradient-border-loading]="toolStatus() === 'pending'"
+  [class.gradient-border-success]="toolStatus() === 'complete'"
+  [class.gradient-border-error]="toolStatus() === 'error'">
+
+    <div class="card-content rounded-lg bg-white dark:bg-gray-800">
+      <div class="px-3 py-1.5">
+        <!-- Compact header with toggle -->
+        <button
+          type="button"
+          class="details-toggle flex items-center gap-2 w-full"
+          [attr.aria-expanded]="isDetailsExpanded()"
+          (click)="toggleDetailsExpanded()"
+        >
+          <!-- Status icon -->
+          <div class="size-4 flex items-center justify-center shrink-0">
+            @switch (toolStatus()) {
+              @case ('pending') {
+                <svg
+                  class="size-4 text-gray-600 dark:text-gray-400 animate-spin"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <circle
+                    class="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    stroke-width="3"
+                  />
+                  <path
+                    class="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                  />
+                </svg>
+              }
+              @case ('complete') {
+                <svg
+                  class="size-4 text-green-600 dark:text-green-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2.5"
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              }
+              @case ('error') {
+                <svg
+                  class="size-4 text-red-600 dark:text-red-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2.5"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              }
+            }
+          </div>
+
+          <!-- Expand/collapse chevron -->
+          <svg
+            class="chevron size-3.5 shrink-0 text-gray-600 dark:text-gray-400"
+            [class.open]="isDetailsExpanded()"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9 5l7 7-7 7"
+            />
+          </svg>
+
+          <!-- Tool name -->
+          <span class="text-sm/5 font-medium text-gray-900 dark:text-white flex-1 text-left">
+            {{ toolName() }}
+          </span>
+
+          <!-- Status text -->
+          <span
+            class="text-xs/5 font-medium shrink-0"
+            [class]="statusIconColor()"
+          >
+            {{ statusText() }}
+          </span>
+        </button>
+
+      <!-- Collapsible details section (input + output) -->
+      <div class="collapsible-content" [class.open]="isDetailsExpanded()">
+        <div class="space-y-2">
+          <!-- Input section -->
+          @if (hasInput()) {
+            <div>
+              <div class="text-xs/5 font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Input
+              </div>
+              <pre
+                class="p-2 bg-gray-100 dark:bg-gray-800 rounded-sm font-mono text-xs overflow-x-auto border border-gray-300 dark:border-gray-600"
+              ><code [innerHTML]="formattedJson() | jsonSyntaxHighlight"></code></pre>
+            </div>
+          }
+
+          <!-- Result section -->
+          @if (hasResult()) {
+            <div>
+              <div class="text-xs/5 font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1.5">
+                <span>Output</span>
+                @if (toolResult()?.status === 'error') {
+                  <span class="text-red-600 dark:text-red-400">(Error)</span>
+                }
+              </div>
+              <div class="space-y-2">
+                <!-- Text/JSON content -->
+                @for (item of resultTextContent(); track $index) {
+                  <div class="p-2 bg-gray-100 dark:bg-gray-800 rounded-sm border border-gray-300 dark:border-gray-600">
+                    @if (item.json) {
+                      <pre class="font-mono text-xs overflow-x-auto"><code [innerHTML]="formatResultContent(item) | jsonSyntaxHighlight"></code></pre>
+                    } @else {
+                      <div class="text-sm/6 text-gray-900 dark:text-gray-100 whitespace-pre-wrap">{{ formatResultContent(item) }}</div>
+                    }
+                  </div>
+                }
+
+                <!-- Image content -->
+                @for (item of resultImageContent(); track $index) {
+                  <div class="rounded-sm overflow-hidden bg-gray-100 dark:bg-gray-800 p-2 border border-gray-300 dark:border-gray-600">
+                    <img
+                      [src]="getImageDataUrl(item)"
+                      alt="Tool result image"
+                      class="max-w-full h-auto rounded-xs"
+                    />
+                  </div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+}

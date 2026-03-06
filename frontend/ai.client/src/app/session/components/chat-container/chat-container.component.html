@@ -1,0 +1,271 @@
+<!-- Skeleton loading state -->
+@if (showSkeleton()) {
+  @if (resolvedConfig().fullPageMode) {
+    <!-- Full-page mode: fixed topnav with sidenav awareness -->
+    <div
+      class="chat-topnav-wrapper"
+      [class.sidenav-expanded]="!isSidenavCollapsed()">
+      <app-topnav />
+    </div>
+  }
+  <div class="relative pb-30 pt-16 max-w-[720px] mx-auto px-4 py-6 min-w-0">
+    <div class="min-w-0 animate-fade-in">
+      <app-paragraph-skeleton />
+    </div>
+  </div>
+} @else if (!hasMessages() && resolvedConfig().showEmptyState) {
+  <!-- Empty state with greeting -->
+  @if (resolvedConfig().embeddedMode) {
+    <!-- Embedded mode: relative wrapper for absolute input positioning -->
+    <div class="chat-embedded-wrapper">
+      <div
+        class="chat-container-empty embedded">
+        <div class="w-full max-w-[720px] animate-fade-in px-4 mt-0 relative">
+          <!-- Greeting (hidden when assistant is selected) -->
+          @if (!assistant()) {
+            <div class="mb-8 flex items-center justify-center gap-4 relative">
+              <div>
+                <app-animated-text [text]="greetingMessage()" [speed]="50" />
+              </div>
+            </div>
+          }
+
+          <!-- Assistant Card (if loaded) -->
+          @if (assistant()) {
+            <div class="mb-6 relative">
+              @if (canCloseAssistant()) {
+                <button
+                  type="button"
+                  (click)="onAssistantClosed()"
+                  class="absolute top-2 right-2 z-10 rounded-sm p-1 text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 dark:hover:text-gray-300 dark:hover:bg-gray-700 dark:focus-visible:outline-primary-400"
+                  aria-label="Remove assistant">
+                  <ng-icon name="heroXMark" class="size-5" aria-hidden="true" />
+                </button>
+              }
+              <app-assistant-card
+                [name]="assistant()!.name"
+                [description]="assistant()!.description"
+                [ownerName]="assistant()!.ownerName"
+                [starters]="assistant()!.starters"
+                [emoji]="assistant()!.emoji ?? ''"
+                [imageUrl]="assistant()!.imageUrl ?? null"
+                (starterSelected)="onStarterSelected($event)" />
+            </div>
+          }
+
+          <!-- Assistant Error Message -->
+          @if (assistantError()) {
+            <div class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <p class="text-sm text-red-800 dark:text-red-200">{{ assistantError() }}</p>
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Fixed input at bottom for embedded empty state -->
+      <div class="chat-input-footer embedded">
+        <app-chat-input
+          [sessionId]="sessionId()"
+          [isChatLoading]="isChatLoading()"
+          [showFileControls]="resolvedConfig().showFileControls"
+          (messageSubmitted)="onMessageSubmitted($event)"
+          (messageCancelled)="onMessageCancelled()"
+          (fileAttached)="onFileAttached($event)"
+          (settingsToggled)="onSettingsToggled()">
+        </app-chat-input>
+      </div>
+    </div>
+  } @else {
+    <!-- Full-page mode: original layout -->
+    @if (assistant()) {
+      <!-- Assistant selected: show only assistant card with fixed input at bottom -->
+      <div
+        class="chat-container-empty full-page"
+        [class.sidenav-expanded]="!isSidenavCollapsed()">
+        <div class="w-full max-w-[720px] animate-fade-in px-4 -mt-20 relative">
+          <!-- Assistant Card -->
+          <div class="mb-6 relative">
+            @if (canCloseAssistant()) {
+              <button
+                type="button"
+                (click)="onAssistantClosed()"
+                class="absolute top-2 right-2 z-10 rounded-sm p-1 text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-600 dark:hover:text-gray-300 dark:hover:bg-gray-700 dark:focus-visible:outline-primary-400"
+                aria-label="Remove assistant">
+                <ng-icon name="heroXMark" class="size-5" aria-hidden="true" />
+              </button>
+            }
+            <app-assistant-card
+              [name]="assistant()!.name"
+              [description]="assistant()!.description"
+              [ownerName]="assistant()!.ownerName"
+              [starters]="assistant()!.starters"
+              [emoji]="assistant()!.emoji ?? ''"
+              [imageUrl]="assistant()!.imageUrl ?? null"
+              (starterSelected)="onStarterSelected($event)" />
+          </div>
+
+          <!-- Assistant Error Message -->
+          @if (assistantError()) {
+            <div class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <p class="text-sm text-red-800 dark:text-red-200">{{ assistantError() }}</p>
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Fixed input at bottom when assistant is selected -->
+      <div
+        class="chat-input-footer full-page"
+        [class.sidenav-expanded]="!isSidenavCollapsed()">
+        <div class="mx-auto px-4 max-w-[720px]">
+          <app-chat-input
+            [sessionId]="sessionId()"
+            [isChatLoading]="isChatLoading()"
+            [showFileControls]="resolvedConfig().showFileControls"
+            (messageSubmitted)="onMessageSubmitted($event)"
+            (messageCancelled)="onMessageCancelled()"
+            (fileAttached)="onFileAttached($event)"
+            (settingsToggled)="onSettingsToggled()">
+          </app-chat-input>
+        </div>
+      </div>
+    } @else {
+      <!-- No assistant: show greeting with inline input -->
+      <div
+        class="chat-container-empty full-page"
+        [class.sidenav-expanded]="!isSidenavCollapsed()">
+        <div class="w-full max-w-[720px] animate-fade-in px-4 -mt-20 relative">
+          <div class="mb-8 flex items-center justify-center gap-4 relative">
+            <img
+              src="/img/logo-light.png"
+              alt="Logo"
+              class="size-14 shrink-0 dark:hidden">
+            <img
+              src="/img/logo-dark.png"
+              alt="Logo"
+              class="hidden size-14 shrink-0 dark:block">
+            <div>
+              <app-animated-text [text]="greetingMessage()" [speed]="50" />
+            </div>
+          </div>
+
+          <!-- Assistant Error Message -->
+          @if (assistantError()) {
+            <div class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <p class="text-sm text-red-800 dark:text-red-200">{{ assistantError() }}</p>
+            </div>
+          }
+
+          <div class="relative">
+            <app-chat-input
+              [sessionId]="sessionId()"
+              [isChatLoading]="isChatLoading()"
+              [showFileControls]="resolvedConfig().showFileControls"
+              (messageSubmitted)="onMessageSubmitted($event)"
+              (messageCancelled)="onMessageCancelled()"
+              (fileAttached)="onFileAttached($event)"
+              (settingsToggled)="onSettingsToggled()">
+            </app-chat-input>
+          </div>
+        </div>
+      </div>
+    }
+  }
+} @else {
+  <!-- Messages view -->
+  @if (resolvedConfig().embeddedMode) {
+    <!-- Embedded mode: wrapper for absolute input positioning -->
+    <div class="chat-embedded-wrapper">
+      <!-- Assistant Error Message -->
+      @if (assistantError()) {
+        <div class="mx-4 mt-2 mb-2 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <p class="text-sm text-red-800 dark:text-red-200">{{ assistantError() }}</p>
+        </div>
+      }
+
+      <div class="chat-messages-container embedded">
+        <div class="min-w-0">
+          <app-message-list
+            [messages]="messages()"
+            [isChatLoading]="isChatLoading()"
+            [streamingMessageId]="streamingMessageId()"
+            [embeddedMode]="true" />
+        </div>
+      </div>
+
+      <!-- Fixed input at bottom -->
+      <div class="chat-input-footer embedded">
+        <!-- Assistant Indicator (floating badge above input) -->
+        @if (assistant()) {
+          <div class="assistant-indicator-input-wrapper embedded">
+            <app-assistant-indicator
+              [name]="assistant()!.name"
+              [emoji]="assistant()!.emoji ?? ''"
+              (indicatorClicked)="onAssistantIndicatorClicked()" />
+          </div>
+        }
+        <app-chat-input
+          [sessionId]="sessionId()"
+          [isChatLoading]="isChatLoading()"
+          [showFileControls]="resolvedConfig().showFileControls"
+          (messageSubmitted)="onMessageSubmitted($event)"
+          (messageCancelled)="onMessageCancelled()"
+          (fileAttached)="onFileAttached($event)"
+          (settingsToggled)="onSettingsToggled()">
+        </app-chat-input>
+      </div>
+    </div>
+  } @else {
+    <!-- Full-page mode: original layout -->
+    @if (resolvedConfig().showTopnav) {
+      <!-- Header (fixed, content scrolls underneath) -->
+      <div
+        class="chat-topnav-wrapper"
+        [class.sidenav-expanded]="!isSidenavCollapsed()">
+        <app-topnav />
+      </div>
+    }
+
+    <!-- Assistant Error Message -->
+    @if (assistantError()) {
+      <div class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+        <p class="text-sm text-red-800 dark:text-red-200">{{ assistantError() }}</p>
+      </div>
+    }
+
+    <div class="chat-messages-container full-page">
+      <div class="min-w-0">
+        <app-message-list
+          [messages]="messages()"
+          [isChatLoading]="isChatLoading()"
+          [streamingMessageId]="streamingMessageId()" />
+      </div>
+    </div>
+
+    <!-- Chat input footer -->
+    <div
+      class="chat-input-footer full-page"
+      [class.sidenav-expanded]="!isSidenavCollapsed()">
+      <div class="mx-auto px-4 max-w-[720px]">
+        <!-- Assistant Indicator (floating badge above input) -->
+        @if (assistant()) {
+          <div class="assistant-indicator-input-wrapper">
+            <app-assistant-indicator
+              [name]="assistant()!.name"
+              [emoji]="assistant()!.emoji ?? ''"
+              (indicatorClicked)="onAssistantIndicatorClicked()" />
+          </div>
+        }
+        <app-chat-input
+          [sessionId]="sessionId()"
+          [isChatLoading]="isChatLoading()"
+          [showFileControls]="resolvedConfig().showFileControls"
+          (messageSubmitted)="onMessageSubmitted($event)"
+          (messageCancelled)="onMessageCancelled()"
+          (fileAttached)="onFileAttached($event)"
+          (settingsToggled)="onSettingsToggled()">
+        </app-chat-input>
+      </div>
+    </div>
+  }
+}

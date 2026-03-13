@@ -7,6 +7,8 @@ import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
 import { AppConfig, getResourceName, applyStandardTags, getRemovalPolicy, getAutoDeleteObjects } from './config';
 
@@ -321,6 +323,100 @@ export class FrontendStack extends cdk.Stack {
       description: 'S3 bucket name for frontend assets',
       tier: ssm.ParameterTier.STANDARD,
     });
+
+    // ============================================================================
+    // Update RAG Documents Bucket CORS (if RAG stack is enabled)
+    // ============================================================================
+    // After CloudFront distribution is created, update the RAG documents bucket
+    // CORS configuration to include the frontend URL. This ensures document uploads
+    // work from the deployed frontend without manual CORS configuration.
+    // ============================================================================
+
+    if (config.ragIngestion.enabled) {
+      const ragDocumentsBucketName = ssm.StringParameter.valueForStringParameter(
+        this,
+        `/${config.projectPrefix}/rag/documents-bucket-name`
+      );
+
+      const updateCorsHandler = new lambda.Function(this, 'UpdateRagCorsFn', {
+        runtime: lambda.Runtime.PYTHON_3_13,
+        handler: 'index.handler',
+        code: lambda.Code.fromInline(`
+import boto3
+import cfnresponse
+
+s3 = boto3.client('s3')
+
+def handler(event, context):
+    try:
+        if event['RequestType'] in ['Create', 'Update']:
+            bucket = event['ResourceProperties']['BucketName']
+            frontend_url = event['ResourceProperties']['FrontendUrl']
+            
+            # Get existing CORS rules
+            try:
+                existing = s3.get_bucket_cors(Bucket=bucket)
+                rules = existing.get('CORSRules', [])
+            except s3.exceptions.ClientError:
+                rules = []
+            
+            # Find or create the rule for document uploads
+            found = False
+            for rule in rules:
+                if 'PUT' in rule.get('AllowedMethods', []):
+                    # Update existing rule to include frontend URL
+                    origins = set(rule.get('AllowedOrigins', []))
+                    origins.add(frontend_url)
+                    origins.add('http://localhost:4200')  # Keep localhost for dev
+                    rule['AllowedOrigins'] = list(origins)
+                    found = True
+                    break
+            
+            if not found:
+                # Create new rule
+                rules.append({
+                    'AllowedOrigins': [frontend_url, 'http://localhost:4200'],
+                    'AllowedMethods': ['GET', 'PUT', 'HEAD'],
+                    'AllowedHeaders': ['Content-Type', 'Content-Length', 'x-amz-*'],
+                    'ExposedHeaders': ['ETag', 'Content-Length', 'Content-Type'],
+                    'MaxAgeSeconds': 3600
+                })
+            
+            # Update bucket CORS
+            s3.put_bucket_cors(Bucket=bucket, CORSConfiguration={'CORSRules': rules})
+            print(f'Updated CORS for {bucket} to include {frontend_url}')
+        
+        cfnresponse.send(event, context, cfnresponse.SUCCESS, {})
+    except Exception as e:
+        print(f'Error: {str(e)}')
+        cfnresponse.send(event, context, cfnresponse.FAILED, {'Error': str(e)})
+`),
+        timeout: cdk.Duration.minutes(2),
+      });
+
+      // Grant permission to update the RAG documents bucket CORS
+      updateCorsHandler.addToRolePolicy(new iam.PolicyStatement({
+        actions: ['s3:GetBucketCors', 's3:PutBucketCors'],
+        resources: [`arn:aws:s3:::${ragDocumentsBucketName}`],
+      }));
+
+      // Create custom resource to trigger the update
+      const frontendUrl = config.domainName 
+        ? `https://${config.domainName}`
+        : `https://${this.distributionDomainName}`;
+      
+      new cdk.CustomResource(this, 'UpdateRagCors', {
+        serviceToken: updateCorsHandler.functionArn,
+        properties: {
+          BucketName: ragDocumentsBucketName,
+          FrontendUrl: frontendUrl,
+          // Force update on every deployment by including timestamp
+          Timestamp: Date.now().toString(),
+        },
+      });
+
+      console.log('📝 RAG documents bucket CORS will be updated with frontend URL');
+    }
 
     // CloudFormation Outputs
     new cdk.CfnOutput(this, 'FrontendBucketName', {

@@ -193,7 +193,7 @@ jobs:
   deploy-app-api:
     name: Deploy App API (Nightly)
     runs-on: ubuntu-latest
-    needs: deploy-infrastructure
+    needs: deploy-inference-api
     if: ${{ github.event.inputs.skip_deployment != 'true' }}
     environment: development
     permissions:
@@ -240,7 +240,7 @@ jobs:
   deploy-inference-api:
     name: Deploy Inference API (Nightly)
     runs-on: ubuntu-latest
-    needs: deploy-infrastructure
+    needs: deploy-rag-ingestion
     if: ${{ github.event.inputs.skip_deployment != 'true' }}
     environment: development
     permissions:
@@ -329,7 +329,7 @@ jobs:
   deploy-frontend:
     name: Deploy Frontend (Nightly)
     runs-on: ubuntu-latest
-    needs: [deploy-infrastructure, install-frontend]
+    needs: [deploy-app-api, install-frontend]
     if: ${{ github.event.inputs.skip_deployment != 'true' }}
     environment: development
     permissions:
@@ -378,7 +378,7 @@ jobs:
   deploy-gateway:
     name: Deploy Gateway (Nightly)
     runs-on: ubuntu-latest
-    needs: deploy-infrastructure
+    needs: deploy-app-api
     if: ${{ github.event.inputs.skip_deployment != 'true' }}
     environment: development
     permissions:

@@ -88,12 +88,17 @@ export class RagIngestionStack extends cdk.Stack {
     // Build CORS origins: auto-include domain + localhost + any explicit config
     const corsOrigins = new Set<string>();
     corsOrigins.add('http://localhost:4200');
+    
+    // Use domainName if provided (custom domain)
     if (config.domainName) {
       corsOrigins.add(`https://${config.domainName}`);
     }
+    
+    // Add any explicit CORS origins from config
     if (config.ragIngestion.corsOrigins) {
       config.ragIngestion.corsOrigins.split(',').map(o => o.trim()).filter(Boolean).forEach(o => corsOrigins.add(o));
     }
+    
     const ragCorsOrigins = Array.from(corsOrigins);
 
     this.documentsBucket = new s3.Bucket(this, 'RagDocumentsBucket', {

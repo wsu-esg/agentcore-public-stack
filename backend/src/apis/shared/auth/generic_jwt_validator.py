@@ -105,18 +105,16 @@ class GenericOIDCJWTValidator:
             HTTPException: If validation fails
         """
         try:
-            # Log token details for debugging
-            try:
-                unverified = jwt.decode(token, options={"verify_signature": False})
-                token_header = jwt.get_unverified_header(token)
-                logger.warning(
-                    f"[DEBUG] Validating token for provider {provider.provider_id}: "
-                    f"iss={unverified.get('iss')}, aud={unverified.get('aud')}, "
-                    f"alg={token_header.get('alg')}, kid={token_header.get('kid')}, "
-                    f"ver={unverified.get('ver')}"
-                )
-            except Exception as e:
-                logger.warning(f"[DEBUG] Could not decode token for inspection: {e}")
+            # Log token details for debugging (only when DEBUG is enabled)
+            if logger.isEnabledFor(logging.DEBUG):
+                try:
+                    token_header = jwt.get_unverified_header(token)
+                    logger.debug(
+                        f"Validating token for provider {provider.provider_id}: "
+                        f"alg={token_header.get('alg')}"
+                    )
+                except Exception:
+                    logger.debug("Could not decode token header for inspection")
 
             # Get signing key from provider's JWKS
             jwks_client = self._get_jwks_client(provider)

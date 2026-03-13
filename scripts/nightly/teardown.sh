@@ -84,6 +84,27 @@ empty_nightly_buckets() {
     log_success "All nightly S3 buckets emptied"
 }
 
+# Force delete Secrets Manager secrets (bypasses 7-day recovery window)
+force_delete_secrets() {
+    log_info "Force-deleting Secrets Manager secrets with prefix: ${CDK_PROJECT_PREFIX}"
+
+    local secret_names=(
+        "${CDK_PROJECT_PREFIX}-auth-secret"
+        "${CDK_PROJECT_PREFIX}-oauth-client-secrets"
+        "${CDK_PROJECT_PREFIX}-auth-provider-secrets"
+    )
+
+    for secret_name in "${secret_names[@]}"; do
+        log_info "Force-deleting secret: ${secret_name}"
+        aws secretsmanager delete-secret \
+            --secret-id "${secret_name}" \
+            --force-delete-without-recovery \
+            --region "${CDK_AWS_REGION}" 2>/dev/null && \
+            log_success "Secret ${secret_name} force-deleted" || \
+            log_warn "Secret ${secret_name} not found or already deleted, skipping"
+    done
+}
+
 # Destroy CDK stacks
 destroy_stacks() {
     log_info "Destroying CDK stacks with prefix: ${CDK_PROJECT_PREFIX}"
@@ -118,6 +139,11 @@ main() {
     
     # Empty S3 buckets first
     empty_nightly_buckets
+    
+    # Force-delete Secrets Manager secrets before CDK destroy
+    # CloudFormation only schedules secrets for deletion (7-day recovery window),
+    # which causes the next nightly deploy to fail with "already exists" errors.
+    force_delete_secrets
     
     # Destroy CDK stacks
     destroy_stacks

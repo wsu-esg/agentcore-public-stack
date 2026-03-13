@@ -1,99 +1,127 @@
-# AgentCore Public Stack
+<div align="center">
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+<!-- IMAGE PLACEHOLDER: Animated GIF or hero banner showing the AgentCore chat interface in action — a user asking a question, the agent streaming a response, and a tool being invoked (e.g., Code Interpreter generating a chart). Dimensions: ~800x400px, optimized for GitHub rendering. -->
+<!-- Example: ![AgentCore Demo](docs/images/hero-demo.gif) -->
+
+# 🤖 AgentCore Public Stack
+
+**An open-source, production-ready Generative AI platform for institutions**
+*Built by Boise State University, designed for everyone.*
+
 [![Infrastructure](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/infrastructure.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/infrastructure.yml)
-[![RAG Ingestion](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/rag-ingestion.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/rag-ingestion.yml)
-[![Inference API](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/inference-api.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/inference-api.yml)
 [![App API](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/app-api.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/app-api.yml)
+[![Inference API](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/inference-api.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/inference-api.yml)
 [![Frontend](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/frontend.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/frontend.yml)
 [![Gateway](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/gateway.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/gateway.yml)
+[![RAG Ingestion](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/rag-ingestion.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/rag-ingestion.yml)
 [![Bootstrap Data](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/bootstrap-data-seeding.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/bootstrap-data-seeding.yml)
 
-> **An open-source, production-ready Generative AI platform for institutions — built by Boise State University, designed for everyone.**
+![Python](https://img.shields.io/badge/Python-3.13+-3776AB?style=flat&logo=python&logoColor=white)
+![Angular](https://img.shields.io/badge/Angular-v21-DD0031?style=flat&logo=angular&logoColor=white)
+![AWS](https://img.shields.io/badge/AWS-Bedrock_AgentCore-FF9900?style=flat&logo=amazonwebservices&logoColor=white)
+![Tailwind](https://img.shields.io/badge/Tailwind_CSS-v4.1-06B6D4?style=flat&logo=tailwindcss&logoColor=white)
+![License](https://img.shields.io/badge/License-PolyForm_Noncommercial-blue?style=flat)
 
-🚀 Want to deploy this at your institution? Fork the repo and follow the [**GitHub Actions Quick Start**](.github/README-ACTIONS.md) to get up and running.
+[Features](#-key-features) · [Architecture](#-architecture) · [Admin Dashboard](#-admin-dashboard) · [Deployment](#-deployment) · [Contributing](#-contributing)
+
+</div>
 
 ---
 
-## What Is This?
+> 🚀 **Ready to deploy?** Fork the repo and follow the [**GitHub Actions Quick Start**](.github/README-ACTIONS.md) to go from zero to an AWS environment in under an hour.
+
+---
+
+<!-- IMAGE PLACEHOLDER: Screenshot of the chat interface showing a multi-turn conversation with the AI assistant. The screenshot should show: (1) a user message with an uploaded image or document, (2) the assistant streaming a response with rich markdown formatting, and (3) a tool invocation panel (e.g., Code Interpreter or web search). Dimensions: ~900x500px. -->
+<!-- Example: ![Chat Interface](docs/images/chat-interface.png) -->
+
+## 🤔 What Is This?
 
 AgentCore Public Stack is the working codebase behind [boisestate.ai](https://boisestate.ai), a full-stack AI assistant platform serving students, faculty, and staff at Boise State University. It combines **AWS Bedrock AgentCore** and **Strands Agents** into a turnkey system that any institution can fork, deploy, and make their own — without writing a single line of agent code.
 
 The platform ships with a modern chat interface, a full admin dashboard, multi-model support, tool and MCP server management, quota enforcement, cost tracking, and role-based access control — all configurable through the UI.
 
-## Why Boise State Built This
+---
+
+## 🎯 Why Boise State Built This
 
 Most institutions face the same AI dilemma: vendor-hosted per-seat subscriptions don't scale, and building from scratch is too expensive.
 
 | The Problem | Our Answer |
 |-------------|------------|
-| **Per-seat pricing doesn't scale** | Consumption-based billing — pay only for tokens used, not seats purchased |
-| **Student data leaves your control** | All data stays inside your AWS account. Bedrock model interactions are never shared with vendors |
-| **Vendor lock-in limits flexibility** | Swap models freely — Claude, Llama, Mistral, GPT, Gemini — no contracts, no lock-in |
-| **Fragmented tool ecosystems** | One platform with MCP servers connecting Canvas, Google Workspace, PeopleSoft, and more |
-| **Inequitable access** | Every student gets the same models and tools — no premium tiers required |
+| 💸 **Per-seat pricing doesn't scale** | Consumption-based billing — pay only for tokens used, not seats purchased |
+| 🔐 **Student data leaves your control** | All data stays inside your AWS account. Bedrock model interactions are never shared with vendors |
+| 🔒 **Vendor lock-in limits flexibility** | Swap models freely — Claude, Llama, Mistral, GPT, Gemini — no contracts, no lock-in |
+| 🧩 **Fragmented tool ecosystems** | One platform with MCP servers connecting Canvas, Google Workspace, PeopleSoft, and more |
+| ⚖️ **Inequitable access** | Every student gets the same models and tools — no premium tiers required |
 
 At 30,000 users, commercial subscriptions would cost upwards of **$7.2M per year**. This platform delivers the same (and more) capabilities at a fraction of the cost.
 
 ---
 
-## Key Features
+## ✨ Key Features
 
-### Model Flexibility
+### 🔄 Model Flexibility
 
 Add, swap, or disable AI models without redeploying. The platform supports **any model available through AWS Bedrock** — Claude, Llama, Mistral, and more — as well as **external providers** like OpenAI and Google Gemini via API. Administrators configure models through the dashboard, set per-model pricing, and control which roles have access. When a better model launches, add it in minutes.
 
-### Cost-Effectiveness
+### 💰 Cost-Effectiveness
 
 Every interaction is tracked at the token level. Automatic **prompt caching** reduces repeated input costs. **Turn-based message buffering** cuts memory API calls by 75%. Quota tiers let administrators set spending limits by role, department, or individual — with soft warnings before hard stops. Real-time cost analytics surface exactly where budget is going.
 
-### Security and Data Privacy
+### 🛡️ Security and Data Privacy
 
 Your data never leaves your AWS account. The platform uses **OIDC authentication** (Entra ID, Cognito, Google) with PKCE, **role-based access control** at every layer, and **SigV4-signed requests** for all MCP tool communication. There are no external data pipelines, no third-party analytics, and no model training on your interactions.
 
-### Independent MCP and Tool Deployment
+### 🔌 Independent MCP and Tool Deployment
 
 Connect institutional systems through **MCP (Model Context Protocol) servers** — no code changes, no redeployment. Register an MCP server URL in the admin dashboard and its tools are automatically discovered, assigned to roles, and made available to users. Deploy MCP servers on your own schedule, on your own infrastructure, completely independent of the core platform.
 
 **Example integrations:**
-- **Canvas LMS** — Course materials, grades, assignments
-- **Google Workspace** — Drive search, Docs, Calendar
-- **PeopleSoft** — Student records, registration
-- **Library Systems** — Research databases, catalog search
-- **Any custom API** — Wrap it in an MCP server and plug it in
+- 📚 **Canvas LMS** — Course materials, grades, assignments
+- 📁 **Google Workspace** — Drive search, Docs, Calendar
+- 🎓 **PeopleSoft** — Student records, registration
+- 🔍 **Library Systems** — Research databases, catalog search
+- 🔧 **Any custom API** — Wrap it in an MCP server and plug it in
 
-### Multimodal Capabilities
+### 🖼️ Multimodal Capabilities
 
-Users can upload images (PNG, JPEG, GIF, WebP) and documents (PDF, CSV, DOCX) directly into conversations. The agent can generate charts and diagrams via Code Interpreter, automate browser tasks, and produce downloadable files like Excel spreadsheets and presentations.
+Users can upload images (PNG, JPEG, GIF, WebP) and documents (PDF, CSV, DOCX) directly into conversations. The agent can generate charts and diagrams. More features to come.
 
-### Memory and Context
+<!-- IMAGE PLACEHOLDER: Side-by-side screenshot showing multimodal capabilities — on the left, a user uploading a PDF document and asking the agent to summarize it; on the right, the agent using Code Interpreter to generate a matplotlib chart from uploaded CSV data. Dimensions: ~900x400px. -->
+<!-- Example: ![Multimodal Capabilities](docs/images/multimodal-demo.png) -->
+
+### 🧠 Memory and Context
 
 A two-tier memory system combines **short-term session history** with **long-term user preferences**. The agent remembers coding style preferences, language choices, and learned facts across sessions — personalization without compromising privacy.
 
 ---
 
-## Admin Dashboard
+## 📊 Admin Dashboard
 
 The admin dashboard gives institutional administrators full control over the platform through a web interface — no code or CLI required.
 
+<!-- IMAGE PLACEHOLDER: Screenshot of the admin dashboard landing page showing the cost analytics overview — a line chart of daily spending, a breakdown by model (pie or bar chart), top users table, and the sidebar navigation with all admin sections visible. Dimensions: ~900x500px. -->
+<!-- Example: ![Admin Dashboard](docs/images/admin-dashboard.png) -->
+
 | Feature | Description |
 |---------|-------------|
-| **Cost Analytics** | Real-time dashboards showing token usage and costs by user, model, and time period. Identify spending trends, view top users, and export reports for budget planning. |
-| **Model Management** | Add, configure, enable, or disable AI models from any supported provider. Set per-model pricing, control access by role, and adjust availability instantly. |
-| **Tool Catalog** | Browse, enable, and configure all available tools — local, built-in, and MCP-sourced. Sync tools from registered MCP servers and control availability per role. |
-| **MCP Server Registration** | Register external MCP servers by URL. Tools are auto-discovered from the server manifest, assigned RBAC permissions, and made available to users — no redeployment needed. |
-| **OAuth Provider Management** | Configure third-party OAuth integrations (Google, Microsoft, GitHub, custom) so MCP tools can authenticate on behalf of users against external services. |
-| **Role Management** | Create application roles with granular permissions over models, tools, and quotas. Map roles to JWT claims from your identity provider for automatic assignment. |
-| **Auth Provider Configuration** | Configure OIDC authentication providers including issuer URLs, client credentials, claim mappings, and login page branding — all from the UI. |
-| **User Management** | Search and browse users, view individual cost breakdowns, quota status, and role assignments. Apply per-user overrides when needed. |
-| **Quota Tiers** | Define quota tiers with monthly and daily cost limits, soft warning thresholds, and hard stops. Assign tiers to roles, email domains, or individual users. |
-| **Quota Overrides** | Grant temporary exceptions — unlimited access for a research sprint, elevated limits for a class project — with automatic expiration dates. |
-| **Quota Inspector** | Debug quota resolution for any user. See which tier resolved, current usage against limits, and recent enforcement events (warnings, blocks, resets). |
-| **Quota Events** | Monitor all quota enforcement activity in real time. Filter by event type, export to CSV, and audit enforcement decisions. |
+| 📈 **Cost Analytics** | Real-time dashboards showing token usage and costs by user, model, and time period. Identify spending trends, view top users, and export reports for budget planning. |
+| 🤖 **Model Management** | Add, configure, enable, or disable AI models from any supported provider. Set per-model pricing, control access by role, and adjust availability instantly. |
+| 🧰 **Tool Catalog** | Browse, enable, and configure all available tools — local, built-in, and MCP-sourced. Sync tools from registered MCP servers and control availability per role. |
+| 🔗 **MCP Server Registration** | Register external MCP servers by URL. Tools are auto-discovered from the server manifest, assigned RBAC permissions, and made available to users — no redeployment needed. |
+| 🔑 **OAuth Provider Management** | Configure third-party OAuth integrations (Google, Microsoft, GitHub, custom) so MCP tools can authenticate on behalf of users against external services. |
+| 👥 **Role Management** | Create application roles with granular permissions over models, tools, and quotas. Map roles to JWT claims from your identity provider for automatic assignment. |
+| 🏛️ **Auth Provider Configuration** | Configure OIDC authentication providers including issuer URLs, client credentials, claim mappings, and login page branding — all from the UI. |
+| 👤 **User Management** | Search and browse users, view individual cost breakdowns, quota status, and role assignments. Apply per-user overrides when needed. |
+| 📏 **Quota Tiers** | Define quota tiers with monthly and daily cost limits, soft warning thresholds, and hard stops. Assign tiers to roles, email domains, or individual users. |
+| ⚡ **Quota Overrides** | Grant temporary exceptions — unlimited access for a research sprint, elevated limits for a class project — with automatic expiration dates. |
+| 🔎 **Quota Inspector** | Debug quota resolution for any user. See which tier resolved, current usage against limits, and recent enforcement events (warnings, blocks, resets). |
+| 📋 **Quota Events** | Monitor all quota enforcement activity in real time. Filter by event type, export to CSV, and audit enforcement decisions. |
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -123,7 +151,10 @@ The admin dashboard gives institutional administrators full control over the pla
 └───────────────┘ └───────────────┘ └───────────────┘ └───────────────┘
 ```
 
-## Technology Stack
+<!-- IMAGE PLACEHOLDER: A polished, designed version of the architecture diagram above — using a tool like Excalidraw, draw.io, or Figma. Use color-coded boxes, clean arrows, and icons for each layer. This would replace or complement the ASCII diagram for a more professional look. Dimensions: ~900x500px. -->
+<!-- Example: ![Architecture Diagram](docs/images/architecture-diagram.png) -->
+
+## 🛠️ Technology Stack
 
 | Layer | Technologies |
 |-------|-------------|
@@ -135,7 +166,9 @@ The admin dashboard gives institutional administrators full control over the pla
 | **Authentication** | OIDC (Entra ID, Cognito, Google) with PKCE |
 | **CI/CD** | GitHub Actions with full CDK deployment automation |
 
-## Deployment
+---
+
+## 🚀 Deployment
 
 The fastest path to production is the **GitHub Actions pipeline**, which automates the entire AWS deployment — infrastructure, backend services, frontend, and MCP gateway — through a series of workflow runs.
 
@@ -152,7 +185,10 @@ The fastest path to production is the **GitHub Actions pipeline**, which automat
 | MCP Gateway | Lambda + API Gateway | Serverless MCP tool endpoints |
 | Data | DynamoDB | Users, sessions, costs, quotas, roles |
 
-### Local Development
+<!-- IMAGE PLACEHOLDER: Screenshot of the GitHub Actions tab showing all deployment workflows with green checkmarks — Infrastructure, App API, Inference API, Frontend, Gateway, RAG Ingestion, and Bootstrap Data pipelines all passing. Dimensions: ~800x400px. -->
+<!-- Example: ![Deployment Pipelines](docs/images/github-actions.png) -->
+
+<!-- ### 💻 Local Development
 
 ```bash
 # Full setup (one-time)
@@ -160,11 +196,13 @@ The fastest path to production is the **GitHub Actions pipeline**, which automat
 
 # Start all services
 ./start.sh
-```
+``` -->
 
 See [backend/README.md](backend/README.md) for detailed backend setup, including authentication provider bootstrapping.
 
-## Project Structure
+---
+
+## 📁 Project Structure
 
 ```
 agentcore-public-stack/
@@ -180,7 +218,7 @@ agentcore-public-stack/
 │       ├── auth/                    # OIDC authentication
 │       ├── session/                 # Chat UI
 │       ├── admin/                   # Admin dashboard
-│       └── services/                # State management
+│       └── services/               # State management
 ├── infrastructure/                  # AWS CDK stacks
 │   └── lib/
 └── .github/
@@ -188,10 +226,30 @@ agentcore-public-stack/
     └── docs/deploy/                 # Deployment guides
 ```
 
-## Contributing
+---
 
-Contributions are welcome. Please open an issue to discuss proposed changes before submitting a pull request.
+## 🤝 Contributing
 
-## License
+Contributions are welcome! Please open an issue to discuss proposed changes before submitting a pull request.
 
-MIT License — see [LICENSE](LICENSE) for details.
+---
+
+## 📄 License
+
+This project is licensed under the **PolyForm Noncommercial License 1.0.0**.
+You may use, modify, and distribute this software for noncommercial purposes only.
+Commercial use, including use in a product or service that generates revenue,
+is prohibited without a separate commercial license.
+
+See the [LICENSE](LICENSE) file for the full license text.
+For commercial licensing inquiries, please contact: [techtransfer@boisestate.edu](mailto:techtransfer@boisestate.edu)
+
+---
+
+<div align="center">
+
+**Built with ❤️ at Boise State University**
+
+[Report a Bug](https://github.com/Boise-State-Development/agentcore-public-stack/issues) · [Request a Feature](https://github.com/Boise-State-Development/agentcore-public-stack/issues) · [Deployment Guide](.github/README-ACTIONS.md)
+
+</div>

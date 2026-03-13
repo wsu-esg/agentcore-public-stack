@@ -322,7 +322,7 @@ def create_runtime(provider_id: str, provider_config: Dict[str, Any]) -> Dict[st
 def update_runtime(runtime_id: str, provider_config: Dict[str, Any]) -> None:
     """
     Update existing AgentCore Runtime with new JWT configuration
-    
+
     Args:
         runtime_id: Runtime ID to update
         provider_config: New provider configuration
@@ -332,35 +332,52 @@ def update_runtime(runtime_id: str, provider_config: Dict[str, Any]) -> None:
         provider_config['issuer_url'],
         provider_config.get('jwks_uri')
     )
-    
+
     logger.info(f"Updating runtime {runtime_id}")
     logger.info(f"New discovery URL: {discovery_url}")
-    
+
     # Fetch current runtime configuration to preserve settings
     current_runtime = bedrock_agentcore.get_agent_runtime(agentRuntimeId=runtime_id)
-    
+
     # Get current container image and other required fields
     current_artifact = current_runtime['agentRuntimeArtifact']
     current_network_config = current_runtime['networkConfiguration']
     current_role_arn = current_runtime['roleArn']
-    
-    # Update runtime with new JWT config (preserve other settings)
-    bedrock_agentcore.update_agent_runtime(
-        agentRuntimeId=runtime_id,
-        agentRuntimeArtifact=current_artifact,
-        authorizerConfiguration={
+
+    # Build the update params, preserving all existing config
+    update_params = {
+        'agentRuntimeId': runtime_id,
+        'agentRuntimeArtifact': current_artifact,
+        'authorizerConfiguration': {
             'customJWTAuthorizer': {
                 'discoveryUrl': discovery_url,
                 'allowedAudience': [provider_config['client_id']]
             }
         },
-        requestHeaderConfiguration={
+        'requestHeaderConfiguration': {
             'requestHeaderAllowlist': ['Authorization']
         },
-        networkConfiguration=current_network_config,
-        roleArn=current_role_arn
-    )
-    
+        'networkConfiguration': current_network_config,
+        'roleArn': current_role_arn
+    }
+
+    # Preserve existing custom headers alongside Authorization
+    if 'requestHeaderConfiguration' in current_runtime:
+        existing_headers = set(
+            current_runtime['requestHeaderConfiguration'].get('requestHeaderAllowlist', [])
+        )
+        existing_headers.add('Authorization')
+        update_params['requestHeaderConfiguration'] = {
+            'requestHeaderAllowlist': sorted(existing_headers)
+        }
+
+    # Preserve environment variables — without this, a JWT config change
+    # would silently wipe all env vars (table names, API keys, etc.)
+    if 'environmentVariables' in current_runtime:
+        update_params['environmentVariables'] = current_runtime['environmentVariables']
+
+    bedrock_agentcore.update_agent_runtime(**update_params)
+
     logger.info(f"Runtime {runtime_id} updated successfully")
 
 

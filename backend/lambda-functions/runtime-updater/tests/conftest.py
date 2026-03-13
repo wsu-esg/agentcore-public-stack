@@ -115,62 +115,64 @@ def lambda_module(mock_bedrock_client):
             return real_boto3_client(service_name, *args, **kwargs)
 
         with patch("boto3.client", side_effect=_patched_client):
-            # Remove cached module so it re-executes top-level code
-            module_key = "lambda_function"
-            sys.modules.pop(module_key, None)
+            # Prevent the Lambda from running pip install at import time
+            with patch("pip._internal.main", return_value=None):
+                # Remove cached module so it re-executes top-level code
+                module_key = "lambda_function"
+                sys.modules.pop(module_key, None)
 
-            # Ensure the Lambda directory is on sys.path for bare imports
-            lambda_dir = os.path.join(
-                os.path.dirname(__file__), os.pardir
-            )
-            lambda_dir = os.path.normpath(lambda_dir)
-            if lambda_dir not in sys.path:
-                sys.path.insert(0, lambda_dir)
+                # Ensure the Lambda directory is on sys.path for bare imports
+                lambda_dir = os.path.join(
+                    os.path.dirname(__file__), os.pardir
+                )
+                lambda_dir = os.path.normpath(lambda_dir)
+                if lambda_dir not in sys.path:
+                    sys.path.insert(0, lambda_dir)
 
-            import lambda_function  # noqa: E402
+                import lambda_function  # noqa: E402
 
-            # --- Create AWS resources inside moto ---
+                # --- Create AWS resources inside moto ---
 
-            # C. DynamoDB table
-            ddb = boto3.client("dynamodb", region_name=AWS_REGION)
-            ddb.create_table(
-                TableName=AUTH_PROVIDERS_TABLE,
-                KeySchema=[
-                    {"AttributeName": "PK", "KeyType": "HASH"},
-                    {"AttributeName": "SK", "KeyType": "RANGE"},
-                ],
-                AttributeDefinitions=[
-                    {"AttributeName": "PK", "AttributeType": "S"},
-                    {"AttributeName": "SK", "AttributeType": "S"},
-                ],
-                BillingMode="PAY_PER_REQUEST",
-            )
+                # C. DynamoDB table
+                ddb = boto3.client("dynamodb", region_name=AWS_REGION)
+                ddb.create_table(
+                    TableName=AUTH_PROVIDERS_TABLE,
+                    KeySchema=[
+                        {"AttributeName": "PK", "KeyType": "HASH"},
+                        {"AttributeName": "SK", "KeyType": "RANGE"},
+                    ],
+                    AttributeDefinitions=[
+                        {"AttributeName": "PK", "AttributeType": "S"},
+                        {"AttributeName": "SK", "AttributeType": "S"},
+                    ],
+                    BillingMode="PAY_PER_REQUEST",
+                )
 
-            # D. SSM parameters
-            ssm = boto3.client("ssm", region_name=AWS_REGION)
-            ssm.put_parameter(
-                Name=f"/{PROJECT_PREFIX}/inference-api/image-tag",
-                Value="v1.0.0",
-                Type="String",
-            )
-            ssm.put_parameter(
-                Name=f"/{PROJECT_PREFIX}/inference-api/ecr-repository-uri",
-                Value="123456789012.dkr.ecr.us-east-1.amazonaws.com/test-repo",
-                Type="String",
-            )
+                # D. SSM parameters
+                ssm = boto3.client("ssm", region_name=AWS_REGION)
+                ssm.put_parameter(
+                    Name=f"/{PROJECT_PREFIX}/inference-api/image-tag",
+                    Value="v1.0.0",
+                    Type="String",
+                )
+                ssm.put_parameter(
+                    Name=f"/{PROJECT_PREFIX}/inference-api/ecr-repository-uri",
+                    Value="123456789012.dkr.ecr.us-east-1.amazonaws.com/test-repo",
+                    Type="String",
+                )
 
-            # E. SNS topic
-            sns = boto3.client("sns", region_name=AWS_REGION)
-            sns.create_topic(Name="test-runtime-update-alerts")
+                # E. SNS topic
+                sns = boto3.client("sns", region_name=AWS_REGION)
+                sns.create_topic(Name="test-runtime-update-alerts")
 
-            # Replace module-level client references with our moto/mock clients
-            lambda_function.dynamodb = ddb
-            lambda_function.ssm = ssm
-            lambda_function.ecr = boto3.client("ecr", region_name=AWS_REGION)
-            lambda_function.bedrock_agentcore = mock_bedrock_client
-            lambda_function.sns = sns
+                # Replace module-level client references with our moto/mock clients
+                lambda_function.dynamodb = ddb
+                lambda_function.ssm = ssm
+                lambda_function.ecr = boto3.client("ecr", region_name=AWS_REGION)
+                lambda_function.bedrock_agentcore = mock_bedrock_client
+                lambda_function.sns = sns
 
-            yield lambda_function
+                yield lambda_function
 
         # Clean up sys.modules to avoid cross-test pollution
         sys.modules.pop("lambda_function", None)

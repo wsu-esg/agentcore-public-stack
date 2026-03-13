@@ -123,6 +123,10 @@ def _make_mock_bedrock_client() -> MagicMock:
         },
         "networkConfiguration": {"networkMode": "PUBLIC"},
         "roleArn": "arn:aws:iam::123456789012:role/test-runtime-role",
+        "requestHeaderConfiguration": {
+            "requestHeaderAllowlist": ["Authorization"]
+        },
+        "environmentVariables": {"TABLE_NAME": "my-table", "API_KEY": "secret-123"},
         "status": "ACTIVE",
     }
     return client

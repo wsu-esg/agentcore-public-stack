@@ -237,3 +237,127 @@ class TestModifyEdgeCases:
         item = _get_provider(mod, pid)
         assert item["agentcoreRuntimeStatus"]["S"] == "UPDATE_FAILED"
         assert "agentcoreRuntimeError" in item
+
+
+class TestModifyPreservesEnvironmentVariables:
+    """Environment variables must survive JWT config updates."""
+
+    def test_modify_preserves_env_vars(self, lambda_module):
+        mod, bedrock = lambda_module
+        pid = "prov-envvars"
+        _seed_provider(mod, pid)
+
+        event = make_modify_event(
+            provider_id=pid,
+            old_issuer_url="https://old.example.com",
+            new_issuer_url="https://new.example.com",
+            old_client_id="same-client",
+            new_client_id="same-client",
+        )
+        mod.lambda_handler(event, {})
+
+        call_kwargs = bedrock.update_agent_runtime.call_args[1]
+        assert call_kwargs["environmentVariables"] == {
+            "TABLE_NAME": "my-table",
+            "API_KEY": "secret-123",
+        }
+
+    def test_modify_works_when_no_env_vars_exist(self, lambda_module):
+        """If the runtime has no env vars, update should still succeed
+        without passing environmentVariables."""
+        mod, bedrock = lambda_module
+        pid = "prov-noenv"
+        _seed_provider(mod, pid)
+
+        # Override mock to return a runtime with no env vars
+        runtime_resp = bedrock.get_agent_runtime.return_value.copy()
+        del runtime_resp["environmentVariables"]
+        bedrock.get_agent_runtime.return_value = runtime_resp
+
+        event = make_modify_event(
+            provider_id=pid,
+            old_issuer_url="https://old.example.com",
+            new_issuer_url="https://new.example.com",
+            old_client_id="same-client",
+            new_client_id="same-client",
+        )
+        mod.lambda_handler(event, {})
+
+        call_kwargs = bedrock.update_agent_runtime.call_args[1]
+        assert "environmentVariables" not in call_kwargs
+
+
+class TestModifyAlwaysIncludesAuthorizationHeader:
+    """Authorization header must always be in the allowlist."""
+
+    def test_modify_always_includes_authorization(self, lambda_module):
+        mod, bedrock = lambda_module
+        pid = "prov-auth-hdr"
+        _seed_provider(mod, pid)
+
+        event = make_modify_event(
+            provider_id=pid,
+            old_issuer_url="https://old.example.com",
+            new_issuer_url="https://new.example.com",
+            old_client_id="same-client",
+            new_client_id="same-client",
+        )
+        mod.lambda_handler(event, {})
+
+        call_kwargs = bedrock.update_agent_runtime.call_args[1]
+        allowlist = call_kwargs["requestHeaderConfiguration"]["requestHeaderAllowlist"]
+        assert "Authorization" in allowlist
+
+    def test_modify_includes_authorization_even_when_field_missing(self, lambda_module):
+        """If get_agent_runtime omits requestHeaderConfiguration entirely,
+        Authorization must still be set."""
+        mod, bedrock = lambda_module
+        pid = "prov-no-hdr"
+        _seed_provider(mod, pid)
+
+        # Override mock to return a runtime with no header config
+        runtime_resp = bedrock.get_agent_runtime.return_value.copy()
+        del runtime_resp["requestHeaderConfiguration"]
+        bedrock.get_agent_runtime.return_value = runtime_resp
+
+        event = make_modify_event(
+            provider_id=pid,
+            old_issuer_url="https://old.example.com",
+            new_issuer_url="https://new.example.com",
+            old_client_id="same-client",
+            new_client_id="same-client",
+        )
+        mod.lambda_handler(event, {})
+
+        call_kwargs = bedrock.update_agent_runtime.call_args[1]
+        allowlist = call_kwargs["requestHeaderConfiguration"]["requestHeaderAllowlist"]
+        assert "Authorization" in allowlist
+
+    def test_modify_preserves_custom_headers(self, lambda_module):
+        mod, bedrock = lambda_module
+        pid = "prov-custom-hdr"
+        _seed_provider(mod, pid)
+
+        # Override mock to include a custom header alongside Authorization
+        runtime_resp = bedrock.get_agent_runtime.return_value.copy()
+        runtime_resp["requestHeaderConfiguration"] = {
+            "requestHeaderAllowlist": [
+                "Authorization",
+                "X-Amzn-Bedrock-AgentCore-Runtime-Custom-Trace-Id",
+            ]
+        }
+        bedrock.get_agent_runtime.return_value = runtime_resp
+
+        event = make_modify_event(
+            provider_id=pid,
+            old_issuer_url="https://old.example.com",
+            new_issuer_url="https://new.example.com",
+            old_client_id="same-client",
+            new_client_id="same-client",
+        )
+        mod.lambda_handler(event, {})
+
+        call_kwargs = bedrock.update_agent_runtime.call_args[1]
+        allowlist = call_kwargs["requestHeaderConfiguration"]["requestHeaderAllowlist"]
+        assert "Authorization" in allowlist
+        assert "X-Amzn-Bedrock-AgentCore-Runtime-Custom-Trace-Id" in allowlist

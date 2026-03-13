@@ -231,3 +231,58 @@ class TestRetryLogic:
         assert call_kwargs["networkConfiguration"] == runtime_resp["networkConfiguration"]
         assert call_kwargs["authorizerConfiguration"] == runtime_resp["authorizerConfiguration"]
         assert call_kwargs["environmentVariables"] == runtime_resp["environmentVariables"]
+
+    def test_update_always_includes_authorization_header(self, lambda_module):
+        """Authorization header MUST be in requestHeaderAllowlist even when
+        the current runtime has NO requestHeaderConfiguration at all."""
+        _seed(lambda_module)
+        runtime_resp = _success_runtime_response()
+        # Simulate the field being absent from GetAgentRuntime response
+        runtime_resp.pop("requestHeaderConfiguration", None)
+        lambda_module.bedrock_agentcore.get_agent_runtime.return_value = runtime_resp
+        lambda_module.bedrock_agentcore.update_agent_runtime.return_value = {}
+
+        with patch("lambda_function.time.sleep"):
+            lambda_module.update_runtime_with_retry(_PROVIDER, "repo:v2.0.0")
+
+        call_kwargs = lambda_module.bedrock_agentcore.update_agent_runtime.call_args[1]
+        header_cfg = call_kwargs["requestHeaderConfiguration"]
+        assert "Authorization" in header_cfg["requestHeaderAllowlist"]
+
+    def test_update_preserves_custom_headers_alongside_authorization(self, lambda_module):
+        """Existing custom headers must be preserved, and Authorization must
+        still be present even if it wasn't in the original allowlist."""
+        _seed(lambda_module)
+        runtime_resp = _success_runtime_response()
+        runtime_resp["requestHeaderConfiguration"] = {
+            "requestHeaderAllowlist": [
+                "X-Amzn-Bedrock-AgentCore-Runtime-Custom-Trace-Id"
+            ]
+        }
+        lambda_module.bedrock_agentcore.get_agent_runtime.return_value = runtime_resp
+        lambda_module.bedrock_agentcore.update_agent_runtime.return_value = {}
+
+        with patch("lambda_function.time.sleep"):
+            lambda_module.update_runtime_with_retry(_PROVIDER, "repo:v2.0.0")
+
+        call_kwargs = lambda_module.bedrock_agentcore.update_agent_runtime.call_args[1]
+        allowlist = call_kwargs["requestHeaderConfiguration"]["requestHeaderAllowlist"]
+        assert "Authorization" in allowlist
+        assert "X-Amzn-Bedrock-AgentCore-Runtime-Custom-Trace-Id" in allowlist
+
+    def test_update_does_not_duplicate_authorization_header(self, lambda_module):
+        """If Authorization is already in the allowlist, it should not appear twice."""
+        _seed(lambda_module)
+        runtime_resp = _success_runtime_response()
+        runtime_resp["requestHeaderConfiguration"] = {
+            "requestHeaderAllowlist": ["Authorization"]
+        }
+        lambda_module.bedrock_agentcore.get_agent_runtime.return_value = runtime_resp
+        lambda_module.bedrock_agentcore.update_agent_runtime.return_value = {}
+
+        with patch("lambda_function.time.sleep"):
+            lambda_module.update_runtime_with_retry(_PROVIDER, "repo:v2.0.0")
+
+        call_kwargs = lambda_module.bedrock_agentcore.update_agent_runtime.call_args[1]
+        allowlist = call_kwargs["requestHeaderConfiguration"]["requestHeaderAllowlist"]
+        assert allowlist.count("Authorization") == 1

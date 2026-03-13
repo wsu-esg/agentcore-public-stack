@@ -18,12 +18,18 @@ import time
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import sys
+
+# Install latest boto3 at runtime to get newest API support
+from pip._internal import main
+main(['install', '-I', '-q', 'boto3', '--target', '/tmp/', '--no-cache-dir', '--disable-pip-version-check'])
+sys.path.insert(0, '/tmp/')
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 import boto3
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, ParamValidationError
 
 # AWS clients
 dynamodb = boto3.client('dynamodb')
@@ -427,18 +433,39 @@ def update_runtime(
     if 'authorizerConfiguration' in current_runtime:
         update_params['authorizerConfiguration'] = current_runtime['authorizerConfiguration']
     
-    # Preserve request header configuration if present
-    # CRITICAL: Without this, the Authorization header stops being forwarded
-    # to the container after update, causing 401s on every request
+    # ALWAYS set requestHeaderConfiguration with Authorization in the allowlist.
+    # The previous approach of conditionally preserving the existing config was
+    # fragile — if the GetAgentRuntime response ever omitted the field (API quirk,
+    # race condition, eventual consistency), the Authorization header would silently
+    # stop being forwarded, causing 401s on every request.
+    # We now build the allowlist from scratch, merging in any existing custom headers.
+    existing_headers = set()
     if 'requestHeaderConfiguration' in current_runtime:
-        update_params['requestHeaderConfiguration'] = current_runtime['requestHeaderConfiguration']
+        existing_headers = set(
+            current_runtime['requestHeaderConfiguration'].get('requestHeaderAllowlist', [])
+        )
+    # Authorization MUST always be present — this is non-negotiable
+    existing_headers.add('Authorization')
+    update_params['requestHeaderConfiguration'] = {
+        'requestHeaderAllowlist': sorted(existing_headers)
+    }
     
     # Preserve environment variables if present
     if 'environmentVariables' in current_runtime:
         update_params['environmentVariables'] = current_runtime['environmentVariables']
     
     # Call UpdateAgentRuntime API
-    bedrock_agentcore.update_agent_runtime(**update_params)
+    try:
+        bedrock_agentcore.update_agent_runtime(**update_params)
+    except ParamValidationError:
+        # SDK version doesn't support requestHeaderConfiguration yet — retry without it.
+        # This is a fallback; the boto3 version should be kept up to date to avoid this path.
+        logger.warning(
+            f"SDK does not support requestHeaderConfiguration (boto3 {boto3.__version__}). "
+            "Retrying without it. UPDATE BOTO3 to preserve Authorization header forwarding."
+        )
+        update_params.pop('requestHeaderConfiguration', None)
+        bedrock_agentcore.update_agent_runtime(**update_params)
     
     logger.info(f"Runtime {runtime_id} update initiated")
 

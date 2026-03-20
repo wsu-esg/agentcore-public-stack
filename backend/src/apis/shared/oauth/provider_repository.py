@@ -3,7 +3,7 @@
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 import boto3
@@ -180,7 +180,7 @@ class OAuthProviderRepository:
             raise ValueError(f"Provider '{create_request.provider_id}' already exists")
 
         try:
-            now = datetime.utcnow().isoformat() + "Z"
+            now = datetime.now(timezone.utc).isoformat() + "Z"
 
             # Create provider object
             provider = OAuthProvider(
@@ -271,7 +271,7 @@ class OAuthProviderRepository:
             if updates.authorization_params is not None:
                 existing.authorization_params = updates.authorization_params
 
-            existing.updated_at = datetime.utcnow().isoformat() + "Z"
+            existing.updated_at = datetime.now(timezone.utc).isoformat() + "Z"
 
             # Update client secret if provided
             if updates.client_secret is not None:

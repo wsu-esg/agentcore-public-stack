@@ -101,7 +101,7 @@ class TestModelAccessService:
                 tools=[],
                 models=["*"],  # Wildcard access
                 quota_tier=None,
-                resolved_at=datetime.utcnow().isoformat() + "Z",
+                resolved_at=datetime.now(timezone.utc).isoformat() + "Z",
             )
         )
 
@@ -127,7 +127,7 @@ class TestModelAccessService:
                 tools=[],
                 models=["claude-opus", "claude-sonnet"],
                 quota_tier=None,
-                resolved_at=datetime.utcnow().isoformat() + "Z",
+                resolved_at=datetime.now(timezone.utc).isoformat() + "Z",
             )
         )
 
@@ -152,7 +152,7 @@ class TestModelAccessService:
                 tools=[],
                 models=["claude-sonnet"],  # Does not include gpt-4o
                 quota_tier=None,
-                resolved_at=datetime.utcnow().isoformat() + "Z",
+                resolved_at=datetime.now(timezone.utc).isoformat() + "Z",
             )
         )
 
@@ -178,7 +178,7 @@ class TestModelAccessService:
                 tools=[],
                 models=[],  # No model access via AppRole
                 quota_tier=None,
-                resolved_at=datetime.utcnow().isoformat() + "Z",
+                resolved_at=datetime.now(timezone.utc).isoformat() + "Z",
             )
         )
 
@@ -205,7 +205,7 @@ class TestModelAccessService:
                 tools=[],
                 models=[],
                 quota_tier=None,
-                resolved_at=datetime.utcnow().isoformat() + "Z",
+                resolved_at=datetime.now(timezone.utc).isoformat() + "Z",
             )
         )
 
@@ -231,7 +231,7 @@ class TestModelAccessService:
                 tools=[],
                 models=["claude-opus"],
                 quota_tier=None,
-                resolved_at=datetime.utcnow().isoformat() + "Z",
+                resolved_at=datetime.now(timezone.utc).isoformat() + "Z",
             )
         )
 
@@ -258,7 +258,7 @@ class TestModelAccessService:
                 tools=[],
                 models=[],  # Admin doesn't have model access configured
                 quota_tier=None,
-                resolved_at=datetime.utcnow().isoformat() + "Z",
+                resolved_at=datetime.now(timezone.utc).isoformat() + "Z",
             )
         )
 
@@ -298,7 +298,7 @@ class TestModelAccessServiceFilterModels:
                 tools=["*"],
                 models=["*"],  # Wildcard
                 quota_tier=None,
-                resolved_at=datetime.utcnow().isoformat() + "Z",
+                resolved_at=datetime.now(timezone.utc).isoformat() + "Z",
             )
         )
 
@@ -337,7 +337,7 @@ class TestModelAccessServiceFilterModels:
                 tools=[],
                 models=["model-1"],
                 quota_tier=None,
-                resolved_at=datetime.utcnow().isoformat() + "Z",
+                resolved_at=datetime.now(timezone.utc).isoformat() + "Z",
             )
         )
 
@@ -361,7 +361,7 @@ class TestModelAccessServiceFilterModels:
                 tools=["*"],
                 models=["*"],
                 quota_tier=None,
-                resolved_at=datetime.utcnow().isoformat() + "Z",
+                resolved_at=datetime.now(timezone.utc).isoformat() + "Z",
             )
         )
 

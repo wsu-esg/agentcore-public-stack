@@ -45,6 +45,7 @@ cdk synth InfrastructureStack \
     --context infrastructureHostedZoneDomain="${CDK_HOSTED_ZONE_DOMAIN}" \
     --context albSubdomain="${CDK_ALB_SUBDOMAIN}" \
     --context certificateArn="${CDK_CERTIFICATE_ARN}" \
+    --context domainName="${CDK_DOMAIN_NAME}" \
     --output "${PROJECT_ROOT}/infrastructure/cdk.out"
 
 log_success "Infrastructure Stack CloudFormation template synthesized successfully"

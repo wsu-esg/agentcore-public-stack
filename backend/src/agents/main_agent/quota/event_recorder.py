@@ -1,7 +1,7 @@
 """Records quota enforcement events."""
 
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import logging
 from apis.shared.auth.models import User
@@ -36,7 +36,7 @@ class QuotaEventRecorder:
             current_usage=current_usage,
             quota_limit=limit,
             percentage_used=percentage_used,
-            timestamp=datetime.utcnow().isoformat() + 'Z',
+            timestamp=datetime.now(timezone.utc).isoformat() + 'Z',
             metadata={
                 "tier_name": tier.tier_name,
                 "session_id": session_id,
@@ -89,7 +89,7 @@ class QuotaEventRecorder:
             current_usage=current_usage,
             quota_limit=limit,
             percentage_used=percentage_used,
-            timestamp=datetime.utcnow().isoformat() + 'Z',
+            timestamp=datetime.now(timezone.utc).isoformat() + 'Z',
             metadata={
                 "threshold": threshold,
                 "tier_name": tier.tier_name,
@@ -121,7 +121,7 @@ class QuotaEventRecorder:
             current_usage=0.0,
             quota_limit=tier.monthly_cost_limit,
             percentage_used=0.0,
-            timestamp=datetime.utcnow().isoformat() + 'Z',
+            timestamp=datetime.now(timezone.utc).isoformat() + 'Z',
             metadata={
                 "override_id": override_id,
                 "tier_name": tier.tier_name,
@@ -151,7 +151,7 @@ class QuotaEventRecorder:
             current_usage=0.0,
             quota_limit=tier.monthly_cost_limit,
             percentage_used=0.0,
-            timestamp=datetime.utcnow().isoformat() + 'Z',
+            timestamp=datetime.now(timezone.utc).isoformat() + 'Z',
             metadata={
                 "reason": reason,
                 "tier_name": tier.tier_name,

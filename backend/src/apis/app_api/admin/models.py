@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class UserInfo(BaseModel):
@@ -34,7 +34,7 @@ class SystemStatsResponse(BaseModel):
     total_sessions: int
     active_sessions: int
     total_messages: int
-    stats_as_of: datetime = Field(default_factory=datetime.utcnow)
+    stats_as_of: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class FoundationModelSummary(BaseModel):

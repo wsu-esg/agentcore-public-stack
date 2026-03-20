@@ -1,7 +1,7 @@
 """Quota checker for enforcing hard limits."""
 
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 from apis.shared.auth.models import User
 from apis.app_api.costs.aggregator import CostAggregator
@@ -187,7 +187,7 @@ class QuotaChecker:
 
     def _get_current_period(self, period_type: str) -> str:
         """Get current period string for cost aggregation"""
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         if period_type == "monthly":
             return now.strftime("%Y-%m")

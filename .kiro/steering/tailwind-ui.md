@@ -1,6 +1,6 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: "**/*.{html,css,ts,component.ts,page.ts}"
+fileMatchPattern: "frontend/*"
 ---
 
 # Tailwind CSS v4.1 Best Practices

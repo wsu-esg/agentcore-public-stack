@@ -1,4 +1,4 @@
-name: "Step 6 — Deploy Gateway (Lambda Tools)"
+name: "5. Deploy Gateway (Lambda Tools)"
 
 on:
   push:
@@ -42,6 +42,9 @@ on:
 env:
   # Build and Deploy Configuration (non-sensitive, repository-level)
   CDK_REQUIRE_APPROVAL: never
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Suppress repeated config dumps from load-env.sh in CI logs
+  LOAD_ENV_QUIET: true
 
 # Ensure only one deployment runs at a time
 concurrency:
@@ -49,6 +52,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check-stack-dependencies:
+    name: Check Stack Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Run stack dependency tests
+        run: |
+          bash scripts/common/test-stack-dependencies.sh
+
   install:
     name: Install Dependencies
     runs-on: ubuntu-latest
@@ -66,18 +80,28 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      - name: Restore node_modules cache
+        id: cache-gateway
+        uses: actions/cache/restore@v5
+        with:
+          path: infrastructure/node_modules
+          key: gateway-node-${{ hashFiles('infrastructure/package-lock.json') }}
 
       - name: Install system dependencies
+        if: steps.cache-gateway.outputs.cache-hit != 'true'
         run: |
           bash scripts/common/install-deps.sh
 
       - name: Install gateway dependencies
+        if: steps.cache-gateway.outputs.cache-hit != 'true'
         run: |
           bash scripts/stack-gateway/install.sh
 
       - name: Save node_modules cache
-        uses: actions/cache/save@v4
+        if: steps.cache-gateway.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
         with:
           path: infrastructure/node_modules
           key: gateway-node-${{ hashFiles('infrastructure/package-lock.json') }}
@@ -85,7 +109,7 @@ jobs:
   build-cdk:
     name: Build CDK Code
     runs-on: ubuntu-latest
-    needs: install
+    needs: [install, check-stack-dependencies]
     
     # Select environment based on trigger
     # Manual: workflow_dispatch input
@@ -100,10 +124,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Restore node_modules cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: infrastructure/node_modules
           key: gateway-node-${{ hashFiles('infrastructure/package-lock.json') }}
@@ -113,7 +137,7 @@ jobs:
           bash scripts/stack-gateway/build-cdk.sh
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: gateway-cdk-build
           path: |
@@ -148,10 +172,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Restore node_modules cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: infrastructure/node_modules
           key: gateway-node-${{ hashFiles('infrastructure/package-lock.json') }}
@@ -159,7 +183,7 @@ jobs:
             gateway-node-
 
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: gateway-cdk-build
           path: infrastructure
@@ -173,7 +197,7 @@ jobs:
           bash scripts/stack-gateway/synth.sh
 
       - name: Upload synthesized templates
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: gateway-cdk-templates
           path: infrastructure/cdk.out/
@@ -212,7 +236,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Configure AWS credentials
         uses: ./.github/actions/configure-aws-credentials
@@ -224,7 +248,7 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
 
       - name: Restore node_modules cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: infrastructure/node_modules
           key: gateway-node-${{ hashFiles('infrastructure/package-lock.json') }}
@@ -232,7 +256,7 @@ jobs:
             gateway-node-
 
       - name: Download synthesized templates
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: gateway-cdk-templates
           path: infrastructure/cdk.out
@@ -242,6 +266,7 @@ jobs:
           bash scripts/common/install-deps.sh
 
       - name: Test CDK stack
+        id: run-tests
         run: |
           bash scripts/stack-gateway/test-cdk.sh
 
@@ -282,7 +307,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Configure AWS credentials
         uses: ./.github/actions/configure-aws-credentials
@@ -294,7 +319,7 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
 
       - name: Restore node_modules cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: infrastructure/node_modules
           key: gateway-node-${{ hashFiles('infrastructure/package-lock.json') }}
@@ -302,7 +327,7 @@ jobs:
             gateway-node-
 
       - name: Download synthesized templates
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: gateway-cdk-templates
           path: infrastructure/cdk.out
@@ -316,37 +341,33 @@ jobs:
           bash scripts/stack-gateway/deploy.sh
 
       - name: Upload stack outputs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: always()
         with:
           name: gateway-deployment-outputs
           path: |
             cdk-outputs-gateway.json
           retention-days: 30
-      
-      - name: Deployment summary
-        if: success()
-        run: | 
-          ENVIRONMENT="${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'production') || (github.ref == 'refs/heads/develop' && 'development') || 'development' }}"
-          
-          echo "## Gateway Stack Deployment Successful ✅" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment**: ${ENVIRONMENT}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Region**: ${CDK_AWS_REGION}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Project**: ${CDK_PROJECT_PREFIX}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Stack**: GatewayStack" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Resources Created" >> $GITHUB_STEP_SUMMARY
-          echo "- Bedrock AgentCore Gateway" >> $GITHUB_STEP_SUMMARY
-          echo "- Lambda Functions (MCP Tools)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ -f cdk-outputs-gateway.json ]; then
-            echo "### Stack Outputs" >> $GITHUB_STEP_SUMMARY
-            echo '```json' >> $GITHUB_STEP_SUMMARY
-            cat cdk-outputs-gateway.json >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate summary
+        if: always()
+        run: |
+          source scripts/common/summary.sh
+
+          if [ "${{ job.status }}" = "success" ]; then
+            STATUS="success"
+          else
+            STATUS="failure"
+          fi
+
+          # --- Workflow header (once for the entire workflow) ---
+          write_workflow_header "Gateway" "$STATUS" "GatewayStack"
+
+          # --- Stack outputs or failure details ---
+          if [ "$STATUS" = "success" ]; then
+            write_cdk_outputs_table "cdk-outputs-gateway.json"
+          else
+            write_failure_summary "CDK Deploy" "1" "Deployment failed — check logs above"
           fi
 
   test-gateway:
@@ -377,7 +398,7 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Configure AWS credentials
         uses: ./.github/actions/configure-aws-credentials
@@ -389,5 +410,6 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
 
       - name: Test Gateway
+        id: run-tests
         run: |
           bash scripts/stack-gateway/test.sh

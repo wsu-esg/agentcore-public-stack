@@ -195,12 +195,12 @@ export class AppApiStack extends cdk.Stack {
     const assistantsCorsOrigins = buildCorsOrigins(config.assistants?.corsOrigins);
 
     const assistantsDocumentsBucket = new s3.Bucket(this, "AssistantsDocumentBucket", {
-      bucketName: getResourceName(config, "assistants-documents"),
+      bucketName: getResourceName(config, "assistants-documents", config.awsAccount),
       encryption: s3.BucketEncryption.S3_MANAGED,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       versioned: true,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      autoDeleteObjects: false,
+      removalPolicy: getRemovalPolicy(config),
+      autoDeleteObjects: getAutoDeleteObjects(config),
       cors: [
         {
           allowedOrigins: assistantsCorsOrigins,
@@ -218,7 +218,7 @@ export class AppApiStack extends cdk.Stack {
     // Create S3 Vector Bucket (not a regular S3 bucket)
     // Using CfnResource since there are no L2 constructs for S3 Vectors yet
     // Bucket name: 3-63 chars, lowercase, numbers, hyphens only
-    const assistantsVectorStoreBucketName = getResourceName(config, "assistants-vector-store-v1");
+    const assistantsVectorStoreBucketName = getResourceName(config, "assistants-vector-store-v1", config.awsAccount);
 
     const assistantsVectorBucket = new CfnResource(this, "AssistantsVectorBucket", {
       type: "AWS::S3Vectors::VectorBucket",
@@ -405,136 +405,28 @@ export class AppApiStack extends cdk.Stack {
     );
 
     // ============================================================
-    // File Upload Storage (S3 + DynamoDB)
+    // File Upload Storage (imported from Infrastructure Stack)
     // ============================================================
+    // These resources were moved to InfrastructureStack to avoid a circular
+    // dependency: InferenceApiStack (tier 2) needs these ARNs but deploys
+    // before AppApiStack (tier 3).
 
-    // Build CORS origins for file upload bucket
-    const fileUploadCorsOrigins = buildCorsOrigins(config.fileUpload?.corsOrigins);
-
-    // S3 Bucket for user file uploads
-    const userFilesBucket = new s3.Bucket(this, "UserFilesBucket", {
-      // Include account ID for global uniqueness
-      bucketName: getResourceName(config, "user-files", config.awsAccount),
-
-      // Security configuration
-      encryption: s3.BucketEncryption.S3_MANAGED,
-      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-      enforceSSL: true,
-      versioned: false,
-
-      // Removal policy based on retention configuration
-      removalPolicy: getRemovalPolicy(config),
-      autoDeleteObjects: getAutoDeleteObjects(config),
-
-      // CORS for browser-based pre-signed URL uploads
-      cors: [
-        {
-          allowedOrigins: fileUploadCorsOrigins,
-          allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.PUT, s3.HttpMethods.HEAD],
-          allowedHeaders: ["Content-Type", "Content-Length", "x-amz-*"],
-          exposedHeaders: ["ETag", "Content-Length", "Content-Type"],
-          maxAge: 3600,
-        },
-      ],
-
-      // Intelligent tiering lifecycle rules
-      lifecycleRules: [
-        {
-          id: "transition-to-ia",
-          transitions: [
-            {
-              storageClass: s3.StorageClass.INFREQUENT_ACCESS,
-              transitionAfter: cdk.Duration.days(30),
-            },
-          ],
-        },
-        {
-          id: "transition-to-glacier",
-          transitions: [
-            {
-              storageClass: s3.StorageClass.GLACIER_INSTANT_RETRIEVAL,
-              transitionAfter: cdk.Duration.days(90),
-            },
-          ],
-        },
-        {
-          id: "expire-objects",
-          expiration: cdk.Duration.days(config.fileUpload?.retentionDays || 365),
-        },
-        {
-          id: "abort-incomplete-multipart",
-          abortIncompleteMultipartUploadAfter: cdk.Duration.days(1),
-        },
-      ],
-    });
-
-    // DynamoDB Table for file metadata
-    /**
-     * Schema:
-     *   PK: USER#{userId}, SK: FILE#{uploadId} - File metadata
-     *   PK: USER#{userId}, SK: QUOTA - User storage quota tracking
-     *   GSI1PK: CONV#{sessionId}, GSI1SK: FILE#{uploadId} - Query files by conversation
-     */
-    const userFilesTable = new dynamodb.Table(this, "UserFilesTable", {
-      tableName: getResourceName(config, "user-files"),
-      partitionKey: {
-        name: "PK",
-        type: dynamodb.AttributeType.STRING,
-      },
-      sortKey: {
-        name: "SK",
-        type: dynamodb.AttributeType.STRING,
-      },
-      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      pointInTimeRecovery: true,
-      timeToLiveAttribute: "ttl",
-      stream: dynamodb.StreamViewType.NEW_AND_OLD_IMAGES,
-      encryption: dynamodb.TableEncryption.AWS_MANAGED,
-      removalPolicy: getRemovalPolicy(config),
-    });
-
-    // GSI1: SessionIndex - Query files by conversation/session
-    userFilesTable.addGlobalSecondaryIndex({
-      indexName: "SessionIndex",
-      partitionKey: {
-        name: "GSI1PK",
-        type: dynamodb.AttributeType.STRING,
-      },
-      sortKey: {
-        name: "GSI1SK",
-        type: dynamodb.AttributeType.STRING,
-      },
-      projectionType: dynamodb.ProjectionType.ALL,
-    });
-
-    // Store file upload resource names in SSM
-    new ssm.StringParameter(this, "UserFilesBucketNameParameter", {
-      parameterName: `/${config.projectPrefix}/file-upload/bucket-name`,
-      stringValue: userFilesBucket.bucketName,
-      description: "User files S3 bucket name",
-      tier: ssm.ParameterTier.STANDARD,
-    });
-
-    new ssm.StringParameter(this, "UserFilesBucketArnParameter", {
-      parameterName: `/${config.projectPrefix}/file-upload/bucket-arn`,
-      stringValue: userFilesBucket.bucketArn,
-      description: "User files S3 bucket ARN",
-      tier: ssm.ParameterTier.STANDARD,
-    });
-
-    new ssm.StringParameter(this, "UserFilesTableNameParameter", {
-      parameterName: `/${config.projectPrefix}/file-upload/table-name`,
-      stringValue: userFilesTable.tableName,
-      description: "User files metadata table name",
-      tier: ssm.ParameterTier.STANDARD,
-    });
-
-    new ssm.StringParameter(this, "UserFilesTableArnParameter", {
-      parameterName: `/${config.projectPrefix}/file-upload/table-arn`,
-      stringValue: userFilesTable.tableArn,
-      description: "User files metadata table ARN",
-      tier: ssm.ParameterTier.STANDARD,
-    });
+    const userFilesBucketName = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/${config.projectPrefix}/user-file-uploads/bucket-name`
+    );
+    const userFilesBucketArn = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/${config.projectPrefix}/user-file-uploads/bucket-arn`
+    );
+    const userFilesTableName = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/${config.projectPrefix}/user-file-uploads/table-name`
+    );
+    const userFilesTableArn = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/${config.projectPrefix}/user-file-uploads/table-arn`
+    );
 
     // ============================================================
     // ECS Task Definition
@@ -578,8 +470,8 @@ export class AppApiStack extends cdk.Stack {
         DYNAMODB_SYSTEM_ROLLUP_TABLE_NAME: systemCostRollupTableName,
         DYNAMODB_USERS_TABLE_NAME: usersTableName,
         DYNAMODB_APP_ROLES_TABLE_NAME: appRolesTableName,
-        DYNAMODB_USER_FILES_TABLE_NAME: userFilesTable.tableName,
-        S3_USER_FILES_BUCKET_NAME: userFilesBucket.bucketName,
+        DYNAMODB_USER_FILES_TABLE_NAME: userFilesTableName,
+        S3_USER_FILES_BUCKET_NAME: userFilesBucketName,
         FILE_UPLOAD_MAX_SIZE_BYTES: String(config.fileUpload?.maxFileSizeBytes || 4194304),
         FILE_UPLOAD_MAX_FILES_PER_MESSAGE: String(config.fileUpload?.maxFilesPerMessage || 5),
         FILE_UPLOAD_USER_QUOTA_BYTES: String(config.fileUpload?.userQuotaBytes || 1073741824),
@@ -927,9 +819,38 @@ export class AppApiStack extends cdk.Stack {
       })
     );
 
-    // Grant permissions for file upload resources
-    userFilesTable.grantReadWriteData(taskDefinition.taskRole);
-    userFilesBucket.grantReadWrite(taskDefinition.taskRole);
+    // Grant permissions for file upload resources (imported from Infrastructure Stack)
+    taskDefinition.taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        sid: 'UserFilesTableReadWrite',
+        effect: iam.Effect.ALLOW,
+        actions: [
+          'dynamodb:GetItem',
+          'dynamodb:PutItem',
+          'dynamodb:UpdateItem',
+          'dynamodb:DeleteItem',
+          'dynamodb:Query',
+          'dynamodb:Scan',
+          'dynamodb:BatchWriteItem',
+          'dynamodb:BatchGetItem',
+        ],
+        resources: [userFilesTableArn, `${userFilesTableArn}/index/*`],
+      })
+    );
+    taskDefinition.taskRole.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        sid: 'UserFilesBucketReadWrite',
+        effect: iam.Effect.ALLOW,
+        actions: [
+          's3:GetObject',
+          's3:PutObject',
+          's3:DeleteObject',
+          's3:GetObjectVersion',
+          's3:ListBucket',
+        ],
+        resources: [userFilesBucketArn, `${userFilesBucketArn}/*`],
+      })
+    );
 
     // Grant Bedrock permissions for title generation (Nova Micro)
     taskDefinition.taskRole.addToPrincipalPolicy(
@@ -1025,7 +946,6 @@ export class AppApiStack extends cdk.Stack {
           'dynamodb:UpdateItem',
           'dynamodb:DeleteItem',
           'dynamodb:Query',
-          'dynamodb:Scan',
         ],
         resources: [apiKeysTableArn, `${apiKeysTableArn}/index/*`],
       })
@@ -1073,6 +993,137 @@ export class AppApiStack extends cdk.Stack {
         ],
       })
     );
+
+    // ============================================================
+    // Fine-Tuning Resources (optional - from SageMakerFineTuningStack)
+    // ============================================================
+
+    // Default: fine-tuning disabled
+    container.addEnvironment('FINE_TUNING_ENABLED', 'false');
+
+    if (config.fineTuning.enabled) {
+      // Import resource identifiers from SageMakerFineTuningStack via SSM
+      const ftJobsTableName = ssm.StringParameter.valueForStringParameter(
+        this, `/${config.projectPrefix}/fine-tuning/jobs-table-name`
+      );
+      const ftJobsTableArn = ssm.StringParameter.valueForStringParameter(
+        this, `/${config.projectPrefix}/fine-tuning/jobs-table-arn`
+      );
+      const ftAccessTableName = ssm.StringParameter.valueForStringParameter(
+        this, `/${config.projectPrefix}/fine-tuning/access-table-name`
+      );
+      const ftAccessTableArn = ssm.StringParameter.valueForStringParameter(
+        this, `/${config.projectPrefix}/fine-tuning/access-table-arn`
+      );
+      const ftDataBucketName = ssm.StringParameter.valueForStringParameter(
+        this, `/${config.projectPrefix}/fine-tuning/data-bucket-name`
+      );
+      const ftDataBucketArn = ssm.StringParameter.valueForStringParameter(
+        this, `/${config.projectPrefix}/fine-tuning/data-bucket-arn`
+      );
+      const sagemakerRoleArn = ssm.StringParameter.valueForStringParameter(
+        this, `/${config.projectPrefix}/fine-tuning/sagemaker-execution-role-arn`
+      );
+      const sagemakerSgId = ssm.StringParameter.valueForStringParameter(
+        this, `/${config.projectPrefix}/fine-tuning/sagemaker-security-group-id`
+      );
+      const ftPrivateSubnetIds = ssm.StringParameter.valueForStringParameter(
+        this, `/${config.projectPrefix}/fine-tuning/private-subnet-ids`
+      );
+
+      // Add fine-tuning environment variables to container
+      container.addEnvironment('FINE_TUNING_ENABLED', 'true');
+      container.addEnvironment('DYNAMODB_FINE_TUNING_JOBS_TABLE_NAME', ftJobsTableName);
+      container.addEnvironment('DYNAMODB_FINE_TUNING_ACCESS_TABLE_NAME', ftAccessTableName);
+      container.addEnvironment('S3_FINE_TUNING_BUCKET_NAME', ftDataBucketName);
+      container.addEnvironment('SAGEMAKER_EXECUTION_ROLE_ARN', sagemakerRoleArn);
+      container.addEnvironment('SAGEMAKER_SECURITY_GROUP_ID', sagemakerSgId);
+      container.addEnvironment('SAGEMAKER_SUBNET_IDS', ftPrivateSubnetIds);
+
+      // Grant ECS task role: DynamoDB access to fine-tuning tables
+      taskDefinition.taskRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          sid: 'FineTuningJobsTableAccess',
+          effect: iam.Effect.ALLOW,
+          actions: [
+            'dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem',
+            'dynamodb:DeleteItem', 'dynamodb:Query', 'dynamodb:Scan',
+          ],
+          resources: [ftJobsTableArn, `${ftJobsTableArn}/index/*`],
+        })
+      );
+
+      taskDefinition.taskRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          sid: 'FineTuningAccessTableAccess',
+          effect: iam.Effect.ALLOW,
+          actions: [
+            'dynamodb:GetItem', 'dynamodb:PutItem', 'dynamodb:UpdateItem',
+            'dynamodb:DeleteItem', 'dynamodb:Query', 'dynamodb:Scan',
+          ],
+          resources: [ftAccessTableArn, `${ftAccessTableArn}/index/*`],
+        })
+      );
+
+      // Grant ECS task role: S3 access to fine-tuning data bucket (for presigned URLs)
+      taskDefinition.taskRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          sid: 'FineTuningDataBucketAccess',
+          effect: iam.Effect.ALLOW,
+          actions: [
+            's3:GetObject', 's3:PutObject', 's3:DeleteObject', 's3:ListBucket',
+          ],
+          resources: [ftDataBucketArn, `${ftDataBucketArn}/*`],
+        })
+      );
+
+      // Grant ECS task role: SageMaker job management
+      taskDefinition.taskRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          sid: 'SageMakerTrainingJobManagement',
+          effect: iam.Effect.ALLOW,
+          actions: [
+            'sagemaker:CreateTrainingJob',
+            'sagemaker:DescribeTrainingJob',
+            'sagemaker:StopTrainingJob',
+            'sagemaker:CreateTransformJob',
+            'sagemaker:DescribeTransformJob',
+            'sagemaker:StopTransformJob',
+          ],
+          resources: [
+            `arn:aws:sagemaker:${config.awsRegion}:${config.awsAccount}:training-job/${config.projectPrefix}-*`,
+            `arn:aws:sagemaker:${config.awsRegion}:${config.awsAccount}:transform-job/${config.projectPrefix}-*`,
+          ],
+        })
+      );
+
+      // Grant iam:PassRole on the SageMaker execution role
+      taskDefinition.taskRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          sid: 'SageMakerPassRole',
+          effect: iam.Effect.ALLOW,
+          actions: ['iam:PassRole'],
+          resources: [sagemakerRoleArn],
+          conditions: {
+            StringEquals: {
+              'iam:PassedToService': 'sagemaker.amazonaws.com',
+            },
+          },
+        })
+      );
+
+      // Grant CloudWatch Logs read access for training job logs
+      taskDefinition.taskRole.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+          sid: 'SageMakerLogsReadAccess',
+          effect: iam.Effect.ALLOW,
+          actions: ['logs:GetLogEvents', 'logs:FilterLogEvents'],
+          resources: [
+            `arn:aws:logs:${config.awsRegion}:${config.awsAccount}:log-group:/aws/sagemaker/*`,
+          ],
+        })
+      );
+    }
 
     // ============================================================
     // Runtime Provisioner Lambda
@@ -1572,14 +1623,14 @@ export class AppApiStack extends cdk.Stack {
     });
 
     new cdk.CfnOutput(this, "UserFilesBucketName", {
-      value: userFilesBucket.bucketName,
-      description: "S3 bucket for user file uploads",
+      value: userFilesBucketName,
+      description: "S3 bucket for user file uploads (imported from Infrastructure Stack)",
       exportName: `${config.projectPrefix}-UserFilesBucketName`,
     });
 
     new cdk.CfnOutput(this, "UserFilesTableName", {
-      value: userFilesTable.tableName,
-      description: "DynamoDB table for file metadata",
+      value: userFilesTableName,
+      description: "DynamoDB table for file metadata (imported from Infrastructure Stack)",
       exportName: `${config.projectPrefix}-UserFilesTableName`,
     });
 

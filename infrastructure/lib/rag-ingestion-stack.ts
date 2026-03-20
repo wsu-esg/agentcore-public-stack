@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as logs from 'aws-cdk-lib/aws-logs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
@@ -9,7 +10,7 @@ import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import { Construct } from 'constructs';
 import { CfnResource } from 'aws-cdk-lib';
-import { AppConfig, getResourceName, applyStandardTags, getRemovalPolicy } from './config';
+import { AppConfig, getResourceName, applyStandardTags, getRemovalPolicy, getAutoDeleteObjects } from './config';
 
 export interface RagIngestionStackProps extends cdk.StackProps {
   config: AppConfig;
@@ -102,12 +103,12 @@ export class RagIngestionStack extends cdk.Stack {
     const ragCorsOrigins = Array.from(corsOrigins);
 
     this.documentsBucket = new s3.Bucket(this, 'RagDocumentsBucket', {
-      bucketName: getResourceName(config, 'rag-documents'),
+      bucketName: getResourceName(config, 'rag-documents', config.awsAccount),
       encryption: s3.BucketEncryption.S3_MANAGED,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       versioned: true,
-      removalPolicy: cdk.RemovalPolicy.RETAIN,
-      autoDeleteObjects: false,
+      removalPolicy: getRemovalPolicy(config),
+      autoDeleteObjects: getAutoDeleteObjects(config),
       cors: ragCorsOrigins.length > 0 ? [
         {
           allowedOrigins: ragCorsOrigins,
@@ -128,7 +129,7 @@ export class RagIngestionStack extends cdk.Stack {
     // ============================================================
 
     // Create S3 Vector Bucket (using CfnResource since there are no L2 constructs yet)
-    const vectorBucketName = getResourceName(config, 'rag-vector-store-v1');
+    const vectorBucketName = getResourceName(config, 'rag-vector-store-v1', config.awsAccount);
 
     const vectorBucket = new CfnResource(this, 'RagVectorBucket', {
       type: 'AWS::S3Vectors::VectorBucket',
@@ -232,6 +233,11 @@ export class RagIngestionStack extends cdk.Stack {
 
     const containerImageUri = `${ecrRepository.repositoryUri}:${imageTag}`;
 
+    const ingestionLogGroup = new logs.LogGroup(this, 'RagIngestionLogGroup', {
+      retention: logs.RetentionDays.ONE_WEEK,
+      removalPolicy: cdk.RemovalPolicy.DESTROY,
+    });
+
     this.ingestionLambda = new lambda.DockerImageFunction(
       this,
       'RagIngestionLambda',
@@ -243,6 +249,7 @@ export class RagIngestionStack extends cdk.Stack {
         architecture: lambda.Architecture.ARM_64, // ARM64 (Graviton2) for better price/performance
         timeout: cdk.Duration.seconds(config.ragIngestion.lambdaTimeout),
         memorySize: config.ragIngestion.lambdaMemorySize,
+        logGroup: ingestionLogGroup,
         environment: {
           S3_ASSISTANTS_DOCUMENTS_BUCKET_NAME: this.documentsBucket.bucketName,
           DYNAMODB_ASSISTANTS_TABLE_NAME: this.assistantsTable.tableName,

@@ -203,7 +203,12 @@ build_cdk_context_params() {
     if [ -n "${CDK_RAG_LAMBDA_TIMEOUT:-}" ]; then
         context_params="${context_params} --context ragIngestion.lambdaTimeout=\"${CDK_RAG_LAMBDA_TIMEOUT}\""
     fi
-    
+
+    # SageMaker Fine-Tuning optional parameters
+    if [ -n "${CDK_FINE_TUNING_ENABLED:-}" ]; then
+        context_params="${context_params} --context fineTuning.enabled=\"${CDK_FINE_TUNING_ENABLED}\""
+    fi
+
     echo "${context_params}"
 }
 
@@ -267,6 +272,9 @@ export CDK_RAG_ENABLED="${CDK_RAG_ENABLED:-$(get_json_value "ragIngestion.enable
 export CDK_RAG_LAMBDA_MEMORY="${CDK_RAG_LAMBDA_MEMORY:-$(get_json_value "ragIngestion.lambdaMemorySize" "${CONTEXT_FILE}")}"
 export CDK_RAG_LAMBDA_TIMEOUT="${CDK_RAG_LAMBDA_TIMEOUT:-$(get_json_value "ragIngestion.lambdaTimeout" "${CONTEXT_FILE}")}"
 
+# SageMaker Fine-Tuning configuration
+export CDK_FINE_TUNING_ENABLED="${CDK_FINE_TUNING_ENABLED:-$(get_json_value "fineTuning.enabled" "${CONTEXT_FILE}")}"
+
 # AWS Account - try multiple sources (env vars take precedence)
 CDK_CONTEXT_ACCOUNT=$(get_json_value "awsAccount" "${CONTEXT_FILE}")
 export CDK_AWS_ACCOUNT="${CDK_AWS_ACCOUNT:-${CDK_CONTEXT_ACCOUNT:-${CDK_DEFAULT_ACCOUNT:-${AWS_ACCOUNT_ID:-}}}}"
@@ -311,41 +319,45 @@ if ! validate_config; then
     return 1 2>/dev/null || exit 1
 fi
 
-# Display loaded configuration
-log_info "📋 Configuration loaded successfully:"
-log_config "  Project Prefix: ${CDK_PROJECT_PREFIX}"
-log_config "  AWS Account:    ${CDK_AWS_ACCOUNT}"
-log_config "  AWS Region:     ${CDK_AWS_REGION}"
-log_config "  App Version:    ${CDK_APP_VERSION}"
-log_config "  Production:     ${CDK_PRODUCTION:-true}"
-log_config "  VPC CIDR:       ${CDK_VPC_CIDR:-<not set>}"
-log_config "  Retain Data:    ${CDK_RETAIN_DATA_ON_DELETE}"
-log_config "  CORS Origins:   ${CDK_CORS_ORIGINS}"
+# Display loaded configuration (skip in quiet mode for CI noise reduction)
+if [ "${LOAD_ENV_QUIET:-false}" != "true" ]; then
+    log_info "📋 Configuration loaded successfully:"
+    log_config "  Project Prefix: ${CDK_PROJECT_PREFIX}"
+    log_config "  AWS Account:    ${CDK_AWS_ACCOUNT}"
+    log_config "  AWS Region:     ${CDK_AWS_REGION}"
+    log_config "  App Version:    ${CDK_APP_VERSION}"
+    log_config "  Production:     ${CDK_PRODUCTION:-true}"
+    log_config "  VPC CIDR:       ${CDK_VPC_CIDR:-<not set>}"
+    log_config "  Retain Data:    ${CDK_RETAIN_DATA_ON_DELETE}"
+    log_config "  CORS Origins:   ${CDK_CORS_ORIGINS}"
 
-if [ -n "${CDK_HOSTED_ZONE_DOMAIN:-}" ]; then
-    log_config "  Hosted Zone:    ${CDK_HOSTED_ZONE_DOMAIN}"
-fi
-
-if [ -n "${CDK_ALB_SUBDOMAIN:-}" ]; then
-    log_config "  ALB Subdomain:  ${CDK_ALB_SUBDOMAIN}.${CDK_HOSTED_ZONE_DOMAIN}"
-fi
-
-if [ -n "${CDK_CERTIFICATE_ARN:-}" ]; then
-    log_config "  Certificate:    ${CDK_CERTIFICATE_ARN:0:50}..." # Truncate for display
-    log_config "  HTTPS Enabled:  Yes"
-fi
-
-# Check AWS credentials
-if ! aws sts get-caller-identity &> /dev/null; then
-    log_warn "AWS credentials not configured or invalid"
-    log_warn "Run 'aws configure' or set AWS_PROFILE environment variable"
-else
-    CALLER_IDENTITY=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "unknown")
-    if [ "${CALLER_IDENTITY}" != "${CDK_AWS_ACCOUNT}" ] && [ "${CALLER_IDENTITY}" != "unknown" ]; then
-        log_warn "AWS credentials account (${CALLER_IDENTITY}) does not match configured account (${CDK_AWS_ACCOUNT})"
-    else
-        log_config "  AWS Identity:   ${CALLER_IDENTITY}"
+    if [ -n "${CDK_HOSTED_ZONE_DOMAIN:-}" ]; then
+        log_config "  Hosted Zone:    ${CDK_HOSTED_ZONE_DOMAIN}"
     fi
-fi
 
-log_info "✅ Environment variables exported and ready for deployment"
+    if [ -n "${CDK_ALB_SUBDOMAIN:-}" ]; then
+        log_config "  ALB Subdomain:  ${CDK_ALB_SUBDOMAIN}.${CDK_HOSTED_ZONE_DOMAIN}"
+    fi
+
+    if [ -n "${CDK_CERTIFICATE_ARN:-}" ]; then
+        log_config "  Certificate:    ${CDK_CERTIFICATE_ARN:0:50}..." # Truncate for display
+        log_config "  HTTPS Enabled:  Yes"
+    fi
+
+    # Check AWS credentials
+    if ! aws sts get-caller-identity &> /dev/null; then
+        log_warn "AWS credentials not configured or invalid"
+        log_warn "Run 'aws configure' or set AWS_PROFILE environment variable"
+    else
+        CALLER_IDENTITY=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo "unknown")
+        if [ "${CALLER_IDENTITY}" != "${CDK_AWS_ACCOUNT}" ] && [ "${CALLER_IDENTITY}" != "unknown" ]; then
+            log_warn "AWS credentials account (${CALLER_IDENTITY}) does not match configured account (${CDK_AWS_ACCOUNT})"
+        else
+            log_config "  AWS Identity:   ${CALLER_IDENTITY}"
+        fi
+    fi
+
+    log_info "✅ Environment variables exported and ready for deployment"
+else
+    log_info "✅ Environment loaded (${CDK_PROJECT_PREFIX} / ${CDK_AWS_REGION} / v${CDK_APP_VERSION})"
+fi

@@ -324,7 +324,6 @@ export class InferenceApiStack extends cdk.Stack {
         'dynamodb:PutItem',
         'dynamodb:UpdateItem',
         'dynamodb:Query',
-        'dynamodb:Scan',
       ],
       resources: [
         apiKeysTableArn,
@@ -358,9 +357,11 @@ export class InferenceApiStack extends cdk.Stack {
     // Documents are only accessed during ingestion (Lambda function)
     // Inference API only queries the vector store, not the raw documents
 
-    // DynamoDB User Files Table permissions (constructed from naming convention)
-    const userFilesTableName = getResourceName(config, 'user-files');
-    const userFilesTableArn = `arn:aws:dynamodb:${config.awsRegion}:${config.awsAccount}:table/${userFilesTableName}`;
+    // DynamoDB User Files Table permissions (imported from Infrastructure Stack)
+    const userFilesTableArn = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/${config.projectPrefix}/user-file-uploads/table-arn`
+    );
     
     runtimeExecutionRole.addToPolicy(new iam.PolicyStatement({
       sid: 'UserFilesTableAccess',
@@ -376,9 +377,11 @@ export class InferenceApiStack extends cdk.Stack {
       ],
     }));
 
-    // S3 User Files Bucket permissions (constructed from naming convention)
-    const userFilesBucketName = getResourceName(config, 'user-files', config.awsAccount);
-    const userFilesBucketArn = `arn:aws:s3:::${userFilesBucketName}`;
+    // S3 User Files Bucket permissions (imported from Infrastructure Stack)
+    const userFilesBucketArn = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/${config.projectPrefix}/user-file-uploads/bucket-arn`
+    );
     
     runtimeExecutionRole.addToPolicy(new iam.PolicyStatement({
       sid: 'UserFilesBucketAccess',

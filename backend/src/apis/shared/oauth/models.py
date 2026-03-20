@@ -3,11 +3,11 @@
 import hashlib
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 logger = logging.getLogger(__name__)
 
@@ -66,8 +66,8 @@ class OAuthProvider:
     revocation_endpoint: Optional[str] = None  # Optional token revocation endpoint
     pkce_required: bool = True  # PKCE is required by default for security
     authorization_params: Dict[str, str] = field(default_factory=dict)  # Extra params for auth URL (e.g., access_type=offline)
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
-    updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat() + "Z")
+    updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat() + "Z")
 
     @property
     def scopes_hash(self) -> str:
@@ -120,8 +120,8 @@ class OAuthProvider:
             revocation_endpoint=item.get("revocationEndpoint"),
             pkce_required=item.get("pkceRequired", True),
             authorization_params=item.get("authorizationParams", {}),
-            created_at=item.get("createdAt", datetime.utcnow().isoformat() + "Z"),
-            updated_at=item.get("updatedAt", datetime.utcnow().isoformat() + "Z"),
+            created_at=item.get("createdAt", datetime.now(timezone.utc).isoformat() + "Z"),
+            updated_at=item.get("updatedAt", datetime.now(timezone.utc).isoformat() + "Z"),
         )
 
 
@@ -137,8 +137,8 @@ class OAuthUserToken:
     expires_at: Optional[int] = None  # Unix timestamp
     scopes_hash: str = ""  # Hash of scopes at time of authorization
     status: OAuthConnectionStatus = OAuthConnectionStatus.CONNECTED
-    connected_at: str = field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
-    updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
+    connected_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat() + "Z")
+    updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat() + "Z")
 
     @property
     def is_expired(self) -> bool:
@@ -188,8 +188,8 @@ class OAuthUserToken:
             expires_at=item.get("expiresAt"),
             scopes_hash=item.get("scopesHash", ""),
             status=OAuthConnectionStatus(item.get("status", "connected")),
-            connected_at=item.get("connectedAt", datetime.utcnow().isoformat() + "Z"),
-            updated_at=item.get("updatedAt", datetime.utcnow().isoformat() + "Z"),
+            connected_at=item.get("connectedAt", datetime.now(timezone.utc).isoformat() + "Z"),
+            updated_at=item.get("updatedAt", datetime.now(timezone.utc).isoformat() + "Z"),
         )
 
 
@@ -217,24 +217,23 @@ class OAuthProviderCreate(BaseModel):
     pkce_required: bool = True
     authorization_params: Dict[str, str] = Field(default_factory=dict)
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "provider_id": "google-workspace",
-                "display_name": "Google Workspace",
-                "provider_type": "google",
-                "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
-                "token_endpoint": "https://oauth2.googleapis.com/token",
-                "client_id": "your-client-id.apps.googleusercontent.com",
-                "client_secret": "your-client-secret",
-                "scopes": ["openid", "email", "profile", "https://www.googleapis.com/auth/drive.readonly"],
-                "allowed_roles": ["admin", "user"],
-                "enabled": True,
-                "icon_name": "heroCloud",
-                "pkce_required": True,
-                "authorization_params": {"access_type": "offline", "prompt": "consent"},
-            }
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "provider_id": "google-workspace",
+            "display_name": "Google Workspace",
+            "provider_type": "google",
+            "authorization_endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
+            "token_endpoint": "https://oauth2.googleapis.com/token",
+            "client_id": "your-client-id.apps.googleusercontent.com",
+            "client_secret": "your-client-secret",
+            "scopes": ["openid", "email", "profile", "https://www.googleapis.com/auth/drive.readonly"],
+            "allowed_roles": ["admin", "user"],
+            "enabled": True,
+            "icon_name": "heroCloud",
+            "pkce_required": True,
+            "authorization_params": {"access_type": "offline", "prompt": "consent"},
         }
+    })
 
 
 class OAuthProviderUpdate(BaseModel):

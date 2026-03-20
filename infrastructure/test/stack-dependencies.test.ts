@@ -33,6 +33,7 @@ const STACK_FILES: Record<string, string> = {
   'infrastructure-stack.ts': 'InfrastructureStack',
   'rag-ingestion-stack.ts': 'RagIngestionStack',
   'gateway-stack.ts': 'GatewayStack',
+  'sagemaker-fine-tuning-stack.ts': 'SageMakerFineTuningStack',
   'inference-api-stack.ts': 'InferenceApiStack',
   'app-api-stack.ts': 'AppApiStack',
   'frontend-stack.ts': 'FrontendStack',
@@ -55,6 +56,7 @@ const DEPLOYMENT_TIERS: Record<string, number> = {
   InfrastructureStack: 0,
   RagIngestionStack: 1,
   GatewayStack: 1,
+  SageMakerFineTuningStack: 1,
   InferenceApiStack: 2,
   AppApiStack: 3,
   FrontendStack: 4,
@@ -377,9 +379,9 @@ describe('Stack Dependency Order', () => {
 
   // ── Extraction Sanity Checks ────────────────────────────────────────
 
-  test('InfrastructureStack writes at least 40 SSM params', () => {
+  test('InfrastructureStack writes at least 44 SSM params', () => {
     const infraWrites = writes.get('InfrastructureStack')!;
-    expect(infraWrites.size).toBeGreaterThanOrEqual(40);
+    expect(infraWrites.size).toBeGreaterThanOrEqual(44);
   });
 
   test('InfrastructureStack reads zero SSM params from other stacks', () => {
@@ -405,9 +407,51 @@ describe('Stack Dependency Order', () => {
     expect(inferenceReads.has('rag/vector-bucket-name')).toBe(true);
   });
 
+  test('InferenceApiStack reads file-upload params from InfrastructureStack', () => {
+    const inferenceReads = reads.get('InferenceApiStack')!;
+    expect(inferenceReads.has('user-file-uploads/table-arn')).toBe(true);
+    expect(inferenceReads.has('user-file-uploads/bucket-arn')).toBe(true);
+  });
+
+  test('AppApiStack reads file-upload params from InfrastructureStack', () => {
+    const appReads = reads.get('AppApiStack')!;
+    expect(appReads.has('user-file-uploads/bucket-name')).toBe(true);
+    expect(appReads.has('user-file-uploads/bucket-arn')).toBe(true);
+    expect(appReads.has('user-file-uploads/table-name')).toBe(true);
+    expect(appReads.has('user-file-uploads/table-arn')).toBe(true);
+  });
+
   test('GatewayStack reads zero SSM params', () => {
     const gatewayReads = reads.get('GatewayStack')!;
     expect(gatewayReads.size).toBe(0);
+  });
+
+  test('SageMakerFineTuningStack reads only from InfrastructureStack (network params)', () => {
+    const ftReads = reads.get('SageMakerFineTuningStack')!;
+    for (const param of ftReads) {
+      expect(param).toMatch(/^network\//);
+    }
+  });
+
+  test('SageMakerFineTuningStack writes fine-tuning SSM params', () => {
+    const ftWrites = writes.get('SageMakerFineTuningStack')!;
+    expect(ftWrites.size).toBeGreaterThanOrEqual(8);
+    expect(ftWrites.has('fine-tuning/jobs-table-name')).toBe(true);
+    expect(ftWrites.has('fine-tuning/jobs-table-arn')).toBe(true);
+    expect(ftWrites.has('fine-tuning/access-table-name')).toBe(true);
+    expect(ftWrites.has('fine-tuning/access-table-arn')).toBe(true);
+    expect(ftWrites.has('fine-tuning/data-bucket-name')).toBe(true);
+    expect(ftWrites.has('fine-tuning/data-bucket-arn')).toBe(true);
+    expect(ftWrites.has('fine-tuning/sagemaker-execution-role-arn')).toBe(true);
+    expect(ftWrites.has('fine-tuning/sagemaker-security-group-id')).toBe(true);
+    expect(ftWrites.has('fine-tuning/private-subnet-ids')).toBe(true);
+  });
+
+  test('AppApiStack reads fine-tuning SSM params from SageMakerFineTuningStack', () => {
+    const appReads = reads.get('AppApiStack')!;
+    expect(appReads.has('fine-tuning/jobs-table-name')).toBe(true);
+    expect(appReads.has('fine-tuning/sagemaker-execution-role-arn')).toBe(true);
+    expect(appReads.has('fine-tuning/data-bucket-name')).toBe(true);
   });
 
   // ── Diagnostic: Print the dependency graph ──────────────────────────

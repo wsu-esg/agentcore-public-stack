@@ -8,13 +8,14 @@
 **An open-source, production-ready Generative AI platform for institutions**
 *Built by Boise State University, designed for everyone.*
 
-[![Infrastructure](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/infrastructure.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/infrastructure.yml)
-[![App API](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/app-api.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/app-api.yml)
-[![Inference API](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/inference-api.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/inference-api.yml)
-[![Frontend](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/frontend.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/frontend.yml)
-[![Gateway](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/gateway.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/gateway.yml)
-[![RAG Ingestion](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/rag-ingestion.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/rag-ingestion.yml)
-[![Bootstrap Data](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/bootstrap-data-seeding.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/bootstrap-data-seeding.yml)
+[![1. Deploy Infrastructure (VPC, ALB, ECS)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/infrastructure.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/infrastructure.yml)
+[![2. Deploy RAG Ingestion](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/rag-ingestion.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/rag-ingestion.yml)
+[![2. Deploy SageMaker Fine-Tuning (Optional)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/sagemaker-fine-tuning.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/sagemaker-fine-tuning.yml)
+[![3. Deploy Inference API (AgentCore Runtime)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/inference-api.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/inference-api.yml)
+[![4. Deploy App API (Backend)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/app-api.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/app-api.yml)
+[![5. Deploy Frontend (CloudFront)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/frontend.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/frontend.yml)
+[![5. Deploy Gateway (Lambda Tools)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/gateway.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/gateway.yml)
+[![6. Seed Bootstrap Data](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/bootstrap-data-seeding.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/bootstrap-data-seeding.yml)
 
 ![Python](https://img.shields.io/badge/Python-3.13+-3776AB?style=flat&logo=python&logoColor=white)
 ![Angular](https://img.shields.io/badge/Angular-v21-DD0031?style=flat&logo=angular&logoColor=white)
@@ -91,6 +92,10 @@ Users can upload images (PNG, JPEG, GIF, WebP) and documents (PDF, CSV, DOCX) di
 <!-- IMAGE PLACEHOLDER: Side-by-side screenshot showing multimodal capabilities — on the left, a user uploading a PDF document and asking the agent to summarize it; on the right, the agent using Code Interpreter to generate a matplotlib chart from uploaded CSV data. Dimensions: ~900x400px. -->
 <!-- Example: ![Multimodal Capabilities](docs/images/multimodal-demo.png) -->
 
+### 🧪 Fine-Tuning
+
+Train and run inference on open-source models directly from the platform. Users with admin-granted access can upload datasets, launch **SageMaker training jobs** on models like BERT, RoBERTa, GPT-2, and more, then run **batch inference** on trained models — all with real-time progress tracking, quota enforcement, and automatic 30-day artifact retention. No ML infrastructure setup required.
+
 ### 🧠 Memory and Context
 
 A two-tier memory system combines **short-term session history** with **long-term user preferences**. The agent remembers coding style preferences, language choices, and learned facts across sessions — personalization without compromising privacy.
@@ -118,6 +123,7 @@ The admin dashboard gives institutional administrators full control over the pla
 | ⚡ **Quota Overrides** | Grant temporary exceptions — unlimited access for a research sprint, elevated limits for a class project — with automatic expiration dates. |
 | 🔎 **Quota Inspector** | Debug quota resolution for any user. See which tier resolved, current usage against limits, and recent enforcement events (warnings, blocks, resets). |
 | 📋 **Quota Events** | Monitor all quota enforcement activity in real time. Filter by event type, export to CSV, and audit enforcement decisions. |
+| 🧪 **Fine-Tuning Access** | Grant or revoke fine-tuning access per user. Set monthly compute-hour quotas and monitor usage across training and inference jobs. |
 
 ---
 
@@ -161,7 +167,7 @@ The admin dashboard gives institutional administrators full control over the pla
 | **Frontend** | Angular v21, TypeScript, Tailwind CSS v4.1+ |
 | **Backend** | Python 3.13+, FastAPI |
 | **Agent Framework** | Strands Agents SDK |
-| **Cloud Services** | AWS Bedrock AgentCore (Runtime, Memory, Gateway, Code Interpreter, Browser) |
+| **Cloud Services** | AWS Bedrock AgentCore (Runtime, Memory, Gateway, Code Interpreter, Browser), Amazon SageMaker |
 | **Infrastructure** | AWS CDK (TypeScript), ECS Fargate, CloudFront, DynamoDB |
 | **Authentication** | OIDC (Entra ID, Cognito, Google) with PKCE |
 | **CI/CD** | GitHub Actions with full CDK deployment automation |
@@ -179,8 +185,10 @@ The fastest path to production is the **GitHub Actions pipeline**, which automat
 | Component | AWS Service | Purpose |
 |-----------|-------------|---------|
 | Networking | VPC, ALB, Security Groups | Isolated network with load balancing |
-| App API | ECS Fargate | Authentication, admin, session management |
+| Fine-Tuning *(optional)* | SageMaker, S3, DynamoDB | Model training, batch inference, artifact storage |
+| RAG Ingestion | Lambda, S3 | Document ingestion for retrieval-augmented generation |
 | Inference API | ECS Fargate | Agent orchestration with Bedrock |
+| App API | ECS Fargate | Authentication, admin, session management |
 | Frontend | S3 + CloudFront | Angular SPA with global CDN |
 | MCP Gateway | Lambda + API Gateway | Serverless MCP tool endpoints |
 | Data | DynamoDB | Users, sessions, costs, quotas, roles |

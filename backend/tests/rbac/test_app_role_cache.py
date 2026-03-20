@@ -6,7 +6,7 @@ of CacheEntry.expires_at to simulate time passage for TTL tests.
 Requirements: 7.1–7.8
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -55,7 +55,7 @@ def _make_role(role_id: str = "editor") -> AppRole:
 
 def _expire_all_entries(cache: AppRoleCache) -> None:
     """Force all cache entries to be expired by setting expires_at in the past."""
-    past = datetime.utcnow() - timedelta(seconds=10)
+    past = datetime.now(timezone.utc) - timedelta(seconds=10)
     for entry in cache._user_cache.values():
         entry.expires_at = past
     for entry in cache._role_cache.values():
@@ -66,7 +66,7 @@ def _expire_all_entries(cache: AppRoleCache) -> None:
 
 def _expire_entry(cache: AppRoleCache, layer: str, key: str) -> None:
     """Force a specific cache entry to be expired."""
-    past = datetime.utcnow() - timedelta(seconds=10)
+    past = datetime.now(timezone.utc) - timedelta(seconds=10)
     store = getattr(cache, f"_{layer}_cache")
     if key in store:
         store[key].expires_at = past

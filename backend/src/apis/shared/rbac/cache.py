@@ -4,7 +4,7 @@ import os
 import asyncio
 import logging
 from typing import Dict, Optional, List, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
 
 from .models import AppRole, UserEffectivePermissions
@@ -21,7 +21,7 @@ class CacheEntry:
 
     @property
     def is_expired(self) -> bool:
-        return datetime.utcnow() >= self.expires_at
+        return datetime.now(timezone.utc) >= self.expires_at
 
 
 class AppRoleCache:
@@ -89,7 +89,7 @@ class AppRoleCache:
         """Cache user permissions."""
         ttl = ttl or self.DEFAULT_USER_TTL
         self._user_cache[f"user:{user_id}"] = CacheEntry(
-            value=permissions, expires_at=datetime.utcnow() + ttl
+            value=permissions, expires_at=datetime.now(timezone.utc) + ttl
         )
 
     # =========================================================================
@@ -107,7 +107,7 @@ class AppRoleCache:
         """Cache role."""
         ttl = ttl or self.DEFAULT_ROLE_TTL
         self._role_cache[f"role:{role.role_id}"] = CacheEntry(
-            value=role, expires_at=datetime.utcnow() + ttl
+            value=role, expires_at=datetime.now(timezone.utc) + ttl
         )
 
     # =========================================================================
@@ -127,7 +127,7 @@ class AppRoleCache:
         """Cache JWT role mapping."""
         ttl = ttl or self.DEFAULT_MAPPING_TTL
         self._jwt_mapping_cache[f"jwt:{jwt_role}"] = CacheEntry(
-            value=role_ids, expires_at=datetime.utcnow() + ttl
+            value=role_ids, expires_at=datetime.now(timezone.utc) + ttl
         )
 
     # =========================================================================

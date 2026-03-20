@@ -129,47 +129,8 @@ describe('AppApiStack', () => {
       });
     });
 
-    test('creates UserFilesTable with PAY_PER_REQUEST billing', () => {
-      template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: `${config.projectPrefix}-user-files`,
-        BillingMode: 'PAY_PER_REQUEST',
-        KeySchema: Match.arrayWith([
-          { AttributeName: 'PK', KeyType: 'HASH' },
-          { AttributeName: 'SK', KeyType: 'RANGE' },
-        ]),
-      });
-    });
-
-    test('UserFilesTable has TTL enabled', () => {
-      template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: `${config.projectPrefix}-user-files`,
-        TimeToLiveSpecification: {
-          AttributeName: 'ttl',
-          Enabled: true,
-        },
-      });
-    });
-
-    test('UserFilesTable has SessionIndex GSI', () => {
-      template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: `${config.projectPrefix}-user-files`,
-        GlobalSecondaryIndexes: Match.arrayWith([
-          Match.objectLike({ IndexName: 'SessionIndex' }),
-        ]),
-      });
-    });
-
-    test('UserFilesTable has DynamoDB Streams enabled', () => {
-      template.hasResourceProperties('AWS::DynamoDB::Table', {
-        TableName: `${config.projectPrefix}-user-files`,
-        StreamSpecification: {
-          StreamViewType: 'NEW_AND_OLD_IMAGES',
-        },
-      });
-    });
-
-    test('creates exactly 2 DynamoDB tables', () => {
-      template.resourceCountIs('AWS::DynamoDB::Table', 2);
+    test('creates exactly 1 DynamoDB table (UserFiles moved to InfrastructureStack)', () => {
+      template.resourceCountIs('AWS::DynamoDB::Table', 1);
     });
   });
 
@@ -182,12 +143,6 @@ describe('AppApiStack', () => {
       template.hasResourceProperties('AWS::S3::Bucket', {
         BucketName: `${config.projectPrefix}-assistants-documents`,
         VersioningConfiguration: { Status: 'Enabled' },
-      });
-    });
-
-    test('creates UserFilesBucket', () => {
-      template.hasResourceProperties('AWS::S3::Bucket', {
-        BucketName: `${config.projectPrefix}-user-files-${config.awsAccount}`,
       });
     });
 
@@ -205,61 +160,8 @@ describe('AppApiStack', () => {
       });
     });
 
-    test('UserFilesBucket has CORS configuration', () => {
-      template.hasResourceProperties('AWS::S3::Bucket', {
-        BucketName: `${config.projectPrefix}-user-files-${config.awsAccount}`,
-        CorsConfiguration: {
-          CorsRules: Match.arrayWith([
-            Match.objectLike({
-              AllowedMethods: ['GET', 'PUT', 'HEAD'],
-            }),
-          ]),
-        },
-      });
-    });
-
-    test('UserFilesBucket blocks all public access', () => {
-      template.hasResourceProperties('AWS::S3::Bucket', {
-        BucketName: `${config.projectPrefix}-user-files-${config.awsAccount}`,
-        PublicAccessBlockConfiguration: {
-          BlockPublicAcls: true,
-          BlockPublicPolicy: true,
-          IgnorePublicAcls: true,
-          RestrictPublicBuckets: true,
-        },
-      });
-    });
-
-    test('UserFilesBucket enforces SSL', () => {
-      // enforceSSL adds a bucket policy denying non-SSL requests
-      template.hasResourceProperties('AWS::S3::BucketPolicy', {
-        PolicyDocument: Match.objectLike({
-          Statement: Match.arrayWith([
-            Match.objectLike({
-              Effect: 'Deny',
-              Condition: { Bool: { 'aws:SecureTransport': 'false' } },
-            }),
-          ]),
-        }),
-      });
-    });
-
-    test('UserFilesBucket has lifecycle rules', () => {
-      template.hasResourceProperties('AWS::S3::Bucket', {
-        BucketName: `${config.projectPrefix}-user-files-${config.awsAccount}`,
-        LifecycleConfiguration: {
-          Rules: Match.arrayWith([
-            Match.objectLike({ Id: 'transition-to-ia' }),
-            Match.objectLike({ Id: 'transition-to-glacier' }),
-            Match.objectLike({ Id: 'expire-objects' }),
-            Match.objectLike({ Id: 'abort-incomplete-multipart' }),
-          ]),
-        },
-      });
-    });
-
-    test('creates exactly 2 S3 buckets', () => {
-      template.resourceCountIs('AWS::S3::Bucket', 2);
+    test('creates exactly 1 S3 bucket (UserFiles moved to InfrastructureStack)', () => {
+      template.resourceCountIs('AWS::S3::Bucket', 1);
     });
   });
 
@@ -383,36 +285,8 @@ describe('AppApiStack', () => {
   // ============================================================
 
   describe('SSM Parameters', () => {
-    test('exports 7 SSM parameters', () => {
-      template.resourceCountIs('AWS::SSM::Parameter', 7);
-    });
-
-    test('exports file-upload/bucket-name', () => {
-      template.hasResourceProperties('AWS::SSM::Parameter', {
-        Name: `/${config.projectPrefix}/file-upload/bucket-name`,
-        Type: 'String',
-      });
-    });
-
-    test('exports file-upload/bucket-arn', () => {
-      template.hasResourceProperties('AWS::SSM::Parameter', {
-        Name: `/${config.projectPrefix}/file-upload/bucket-arn`,
-        Type: 'String',
-      });
-    });
-
-    test('exports file-upload/table-name', () => {
-      template.hasResourceProperties('AWS::SSM::Parameter', {
-        Name: `/${config.projectPrefix}/file-upload/table-name`,
-        Type: 'String',
-      });
-    });
-
-    test('exports file-upload/table-arn', () => {
-      template.hasResourceProperties('AWS::SSM::Parameter', {
-        Name: `/${config.projectPrefix}/file-upload/table-arn`,
-        Type: 'String',
-      });
+    test('exports 3 SSM parameters (file-upload params moved to InfrastructureStack)', () => {
+      template.resourceCountIs('AWS::SSM::Parameter', 3);
     });
 
     test('exports lambda/runtime-provisioner-arn', () => {

@@ -4,6 +4,22 @@
 @import '@ctrl/ngx-emoji-mart/picker';
 @custom-variant dark (&:where(.dark, .dark *));
 
+@font-face {
+    font-family: 'InterVariable';
+    font-style: normal;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('/fonts/InterVariable.woff2') format('woff2');
+}
+
+@font-face {
+    font-family: 'InterVariable';
+    font-style: italic;
+    font-weight: 100 900;
+    font-display: swap;
+    src: url('/fonts/InterVariable-Italic.woff2') format('woff2');
+}
+
 /* CDK Overlay styles - required for proper overlay positioning */
 @import "@angular/cdk/overlay-prebuilt.css";
 
@@ -258,6 +274,9 @@ html.dark body {
 }
 
 @theme {
+    --font-sans: 'InterVariable', sans-serif;
+    --font-sans--font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+
     /* Primary color scale - #0033a0 */
     --color-primary-50: oklch(from #0033a0 calc(l + 0.4) c h);
     --color-primary-100: oklch(from #0033a0 calc(l + 0.35) c h);

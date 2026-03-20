@@ -1,7 +1,7 @@
 """Seed default system roles on startup."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .models import AppRole, EffectivePermissions
 from .repository import AppRoleRepository
@@ -63,7 +63,7 @@ async def seed_system_roles(repository: AppRoleRepository = None):
         repository = AppRoleRepository()
 
     roles_to_seed = [SYSTEM_ADMIN_ROLE, DEFAULT_ROLE]
-    now = datetime.utcnow().isoformat() + "Z"
+    now = datetime.now(timezone.utc).isoformat() + "Z"
 
     for role in roles_to_seed:
         try:

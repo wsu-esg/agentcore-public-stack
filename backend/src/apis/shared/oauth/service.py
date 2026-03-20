@@ -7,7 +7,7 @@ import os
 import secrets
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
 import httpx
@@ -275,7 +275,7 @@ class OAuthService:
                 encrypted_refresh = self._encryption.encrypt(refresh_token)
 
             # Create token record
-            now = datetime.utcnow().isoformat() + "Z"
+            now = datetime.now(timezone.utc).isoformat() + "Z"
             user_token = OAuthUserToken(
                 user_id=user_id,
                 provider_id=provider_id,

@@ -16,7 +16,8 @@ import {
   heroChatBubbleLeftRight,
   heroDocument,
   heroBriefcase,
-  heroLink
+  heroLink,
+  heroBeaker,
 } from '@ng-icons/heroicons/outline';
 import { ThemeService, ThemePreference } from './theme-toggle/theme.service';
 import { ConfigService } from '../../../services/config.service';
@@ -46,7 +47,8 @@ export interface User {
       heroComputerDesktop,
       heroChatBubbleLeftRight,
       heroDocument,
-      heroLink
+      heroLink,
+      heroBeaker,
     })
   ],
   template: `

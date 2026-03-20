@@ -2,7 +2,7 @@
 Timezone utilities for agent system prompts
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -46,9 +46,9 @@ def get_current_date_pacific() -> str:
             return now.strftime(f"%Y-%m-%d (%A) %H:00 {tz_abbr}")
         else:
             # Fallback to UTC if no timezone library available
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             return now.strftime("%Y-%m-%d (%A) %H:00 UTC")
     except Exception as e:
         logger.warning(f"Failed to get Pacific time: {e}, using UTC")
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         return now.strftime("%Y-%m-%d (%A) %H:00 UTC")

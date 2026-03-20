@@ -553,7 +553,7 @@ export class ApiKeysPage {
         this.createdKeySecret.set(res.key);
         this.toast.success('API Key Created', `Key "${name}" has been generated.`);
       },
-      error: () => this.toast.success('Error', 'Failed to create API key.'),
+      error: () => this.toast.error('Failed to create API key.'),
     });
   }
 
@@ -566,7 +566,7 @@ export class ApiKeysPage {
         this.apiKey.set(null);
         this.toast.success('Key Deleted', `API key "${key.name}" has been removed.`);
       },
-      error: () => this.toast.success('Error', 'Failed to delete API key.'),
+      error: () => this.toast.error('Failed to delete API key.'),
     });
   }
 

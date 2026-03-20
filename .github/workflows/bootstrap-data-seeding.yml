@@ -1,4 +1,4 @@
-name: "Step 7 — Seed Bootstrap Data"
+name: "6. Seed Bootstrap Data"
 
 on:
   workflow_dispatch:
@@ -19,6 +19,11 @@ on:
         description: 'Deployment environment'
         required: true
         type: string
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Suppress repeated config dumps from load-env.sh in CI logs
+  LOAD_ENV_QUIET: true
 
 concurrency:
   group: bootstrap-data-seeding-${{ github.ref }}
@@ -59,7 +64,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Configure AWS credentials
         uses: ./.github/actions/configure-aws-credentials
@@ -78,11 +83,19 @@ jobs:
         run: |
           bash scripts/stack-bootstrap/seed.sh
 
-      - name: Seeding summary
-        if: success()
+      - name: Generate summary
+        if: always()
         run: |
-          echo "## Bootstrap Data Seeding Complete ✅" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment**: ${{ inputs.environment }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Region**: ${CDK_AWS_REGION}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Project**: ${CDK_PROJECT_PREFIX}" >> $GITHUB_STEP_SUMMARY
+          source scripts/common/summary.sh
+
+          if [ "${{ job.status }}" = "success" ]; then
+            STATUS="success"
+          else
+            STATUS="failure"
+          fi
+
+          write_workflow_header "Bootstrap Data Seeding" "$STATUS" "BootstrapStack"
+
+          if [ "$STATUS" = "failure" ]; then
+            write_failure_summary "Bootstrap Seed" "1" "Seeding failed — check logs above"
+          fi

@@ -11,7 +11,7 @@ import json
 import logging
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
 from .models import Assistant
@@ -26,7 +26,7 @@ def _generate_assistant_id() -> str:
 
 def _get_current_timestamp() -> str:
     """Get current timestamp in ISO 8601 format"""
-    return datetime.utcnow().isoformat() + "Z"
+    return datetime.now(timezone.utc).isoformat() + "Z"
 
 
 async def create_assistant_draft(owner_id: str, owner_name: str, name: Optional[str] = None) -> Assistant:

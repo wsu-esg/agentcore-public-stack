@@ -2,7 +2,7 @@
 
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 import boto3
@@ -190,7 +190,7 @@ class OAuthTokenRepository:
             raise RuntimeError("OAuth token repository is not enabled")
 
         try:
-            token.updated_at = datetime.utcnow().isoformat() + "Z"
+            token.updated_at = datetime.now(timezone.utc).isoformat() + "Z"
             self._table.put_item(Item=token.to_dynamo_item())
             logger.info(f"Saved token for user {token.user_id}, provider {token.provider_id}")
             return token

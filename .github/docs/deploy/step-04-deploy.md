@@ -10,7 +10,7 @@
 
 ---
 
-Now for the fun part. You'll trigger 7 GitHub Actions workflows in order. Each one deploys a different layer of the stack.
+Now for the fun part. You'll trigger up to 8 GitHub Actions workflows in order. Each one deploys a different layer of the stack. Workflows that share the same step number can be run in parallel — just wait for the previous step to finish first.
 
 ## What you'll need for this step
 
@@ -40,11 +40,15 @@ Now for the fun part. You'll trigger 7 GitHub Actions workflows in order. Each o
 |:-:|---------|-----------------|
 | 1 | **Deploy Infrastructure** | VPC, subnets, ALB, ECS cluster, DynamoDB tables, S3 buckets |
 | 2 | **Deploy RAG Ingestion** | Document ingestion pipeline for retrieval-augmented generation |
+| 2 | **Deploy SageMaker Fine-Tuning** *(optional)* | SageMaker training/inference resources, S3 bucket, DynamoDB tables. Requires `CDK_FINE_TUNING_ENABLED=true` ([Step 3](./step-03-github-config.md#optional-features)). |
 | 3 | **Deploy Inference API** | Strands Agent runtime container on ECS (Bedrock AgentCore) |
 | 4 | **Deploy App API** | Backend REST API container on ECS |
 | 5 | **Deploy Frontend** | Angular app to S3 + CloudFront distribution |
-| 6 | **Deploy Gateway** | Lambda functions for MCP tool endpoints |
-| 7 | **Seed Bootstrap Data** | Auth provider, default models, roles, tools, and admin config |
+| 5 | **Deploy Gateway** | Lambda functions for MCP tool endpoints |
+| 6 | **Seed Bootstrap Data** | Auth provider, default models, roles, tools, and admin config |
+
+> [!TIP]
+> Steps that share the same number can be deployed in parallel — just wait for the previous step to finish first.
 
 ### Status Badges
 
@@ -52,13 +56,14 @@ You can monitor the current state of each workflow:
 
 | Workflow | Status |
 |----------|--------|
-| Deploy Infrastructure | [![Step 1](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/infrastructure.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/infrastructure.yml) |
-| Deploy RAG Ingestion | [![Step 2](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/rag-ingestion.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/rag-ingestion.yml) |
-| Deploy Inference API | [![Step 3](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/inference-api.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/inference-api.yml) |
-| Deploy App API | [![Step 4](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/app-api.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/app-api.yml) |
-| Deploy Frontend | [![Step 5](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/frontend.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/frontend.yml) |
-| Deploy Gateway | [![Step 6](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/gateway.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/gateway.yml) |
-| Seed Bootstrap Data | [![Step 7](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/bootstrap-data-seeding.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/bootstrap-data-seeding.yml) |
+| Deploy Infrastructure | [![1.](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/infrastructure.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/infrastructure.yml) |
+| Deploy RAG Ingestion | [![2.](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/rag-ingestion.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/rag-ingestion.yml) |
+| Deploy SageMaker Fine-Tuning *(optional)* | [![2.](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/sagemaker-fine-tuning.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/sagemaker-fine-tuning.yml) |
+| Deploy Inference API | [![3.](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/inference-api.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/inference-api.yml) |
+| Deploy App API | [![4.](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/app-api.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/app-api.yml) |
+| Deploy Frontend | [![5.](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/frontend.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/frontend.yml) |
+| Deploy Gateway | [![5.](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/gateway.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/gateway.yml) |
+| Seed Bootstrap Data | [![6.](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/bootstrap-data-seeding.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/bootstrap-data-seeding.yml) |
 
 > [!NOTE]
 > All workflows default to the **production** environment when triggered manually.
@@ -86,6 +91,21 @@ This is the longest-running workflow on first deploy (~15-20 minutes).
 <summary>2. Deploy RAG Ingestion</summary>
 
 Sets up the document ingestion pipeline for retrieval-augmented generation. This enables your agents to search through uploaded documents when answering questions.
+
+</details>
+
+<details>
+<summary>2. Deploy SageMaker Fine-Tuning (Optional)</summary>
+
+Deploys the ML training and inference infrastructure for fine-tuning open-source models. This step is optional — skip it if you don't need fine-tuning capabilities. To enable, set the `CDK_FINE_TUNING_ENABLED` variable to `true` in your GitHub environment before running.
+
+Creates:
+- DynamoDB tables for job tracking and access control
+- S3 bucket for datasets, model artifacts, and inference results (30-day lifecycle)
+- SageMaker execution IAM role
+- Security group for SageMaker training jobs (outbound HTTPS only)
+
+After deployment, grant fine-tuning access to users via the admin dashboard.
 
 </details>
 
@@ -118,14 +138,14 @@ Builds the Angular application and deploys it to:
 </details>
 
 <details>
-<summary>6. Deploy Gateway (Lambda Tools)</summary>
+<summary>5. Deploy Gateway (Lambda Tools)</summary>
 
 Deploys Lambda-based MCP tool endpoints behind API Gateway. These provide the agent with access to external services like Wikipedia, ArXiv, financial data, and more. Tools are invoked via MCP protocol with AWS SigV4 authentication.
 
 </details>
 
 <details>
-<summary>7. Seed Bootstrap Data</summary>
+<summary>6. Seed Bootstrap Data</summary>
 
 Seeds your application with initial configuration:
 - Auth provider (from your `SEED_AUTH_*` variables)

@@ -33,7 +33,7 @@ class CostAggregator:
         cache_key = self._get_cache_key(user_id, period)
         if cache_key in self._cache:
             summary, cached_at = self._cache[cache_key]
-            if datetime.utcnow() - cached_at < timedelta(seconds=self.cache_ttl):
+            if datetime.now(timezone.utc) - cached_at < timedelta(seconds=self.cache_ttl):
                 logger.debug(f"Cost summary cache hit for user {user_id}, period {period}")
                 return summary
             else:
@@ -44,7 +44,7 @@ class CostAggregator:
     def _set_cached(self, user_id: str, period: str, summary: UserCostSummary) -> None:
         """Cache a summary"""
         cache_key = self._get_cache_key(user_id, period)
-        self._cache[cache_key] = (summary, datetime.utcnow())
+        self._cache[cache_key] = (summary, datetime.now(timezone.utc))
         logger.debug(f"Cost summary cached for user {user_id}, period {period}")
 
     def invalidate_cache(self, user_id: Optional[str] = None, period: Optional[str] = None) -> None:

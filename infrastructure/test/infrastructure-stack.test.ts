@@ -110,8 +110,8 @@ describe('InfrastructureStack', () => {
   // ------------------------------------------------------------------
   // 6. All DynamoDB tables are created (count)
   // ------------------------------------------------------------------
-  test('creates all 13 DynamoDB tables', () => {
-    template.resourceCountIs('AWS::DynamoDB::Table', 13);
+  test('creates all 14 DynamoDB tables', () => {
+    template.resourceCountIs('AWS::DynamoDB::Table', 14);
   });
 
   // ------------------------------------------------------------------
@@ -214,6 +214,50 @@ describe('InfrastructureStack', () => {
     });
   });
 
+  test('UserFiles table has PK/SK, TTL, stream, and SessionIndex GSI', () => {
+    template.hasResourceProperties('AWS::DynamoDB::Table', {
+      TableName: Match.stringLikeRegexp('user-files'),
+      KeySchema: Match.arrayWith([
+        { AttributeName: 'PK', KeyType: 'HASH' },
+        { AttributeName: 'SK', KeyType: 'RANGE' },
+      ]),
+      TimeToLiveSpecification: {
+        AttributeName: 'ttl',
+        Enabled: true,
+      },
+      StreamSpecification: {
+        StreamViewType: 'NEW_AND_OLD_IMAGES',
+      },
+      GlobalSecondaryIndexes: Match.arrayWith([
+        Match.objectLike({ IndexName: 'SessionIndex' }),
+      ]),
+    });
+  });
+
+  test('UserFiles S3 bucket blocks all public access and enforces SSL', () => {
+    template.hasResourceProperties('AWS::S3::Bucket', {
+      PublicAccessBlockConfiguration: {
+        BlockPublicAcls: true,
+        BlockPublicPolicy: true,
+        IgnorePublicAcls: true,
+        RestrictPublicBuckets: true,
+      },
+    });
+  });
+
+  test('UserFiles S3 bucket has lifecycle rules', () => {
+    template.hasResourceProperties('AWS::S3::Bucket', {
+      LifecycleConfiguration: {
+        Rules: Match.arrayWith([
+          Match.objectLike({ Id: 'transition-to-ia' }),
+          Match.objectLike({ Id: 'transition-to-glacier' }),
+          Match.objectLike({ Id: 'expire-objects' }),
+          Match.objectLike({ Id: 'abort-incomplete-multipart' }),
+        ]),
+      },
+    });
+  });
+
   test('all DynamoDB tables use PAY_PER_REQUEST billing', () => {
     const tables = template.findResources('AWS::DynamoDB::Table');
     for (const [logicalId, resource] of Object.entries(tables)) {
@@ -256,9 +300,9 @@ describe('InfrastructureStack', () => {
   // ------------------------------------------------------------------
   // 10. SSM parameters are created (at least 40+)
   // ------------------------------------------------------------------
-  test('creates at least 40 SSM StringParameters', () => {
+  test('creates at least 44 SSM StringParameters', () => {
     const params = template.findResources('AWS::SSM::Parameter');
-    expect(Object.keys(params).length).toBeGreaterThanOrEqual(40);
+    expect(Object.keys(params).length).toBeGreaterThanOrEqual(44);
   });
 
   test('SSM parameters include key network exports', () => {
@@ -303,6 +347,10 @@ describe('InfrastructureStack', () => {
       'admin/managed-models-table-name',
       'auth/auth-providers-table-name',
       'auth/auth-providers-stream-arn',
+      'user-file-uploads/bucket-name',
+      'user-file-uploads/bucket-arn',
+      'user-file-uploads/table-name',
+      'user-file-uploads/table-arn',
     ];
 
     for (const param of expectedParams) {
@@ -381,23 +429,23 @@ describe('InfrastructureStack', () => {
   });
 
   // ------------------------------------------------------------------
-  // OAuth client secrets are always RETAIN
+  // OAuth client secrets follow config-driven removal policy
   // ------------------------------------------------------------------
-  test('OAuth client secrets secret has RETAIN removal policy', () => {
+  test('OAuth client secrets secret has config-driven removal policy', () => {
     template.hasResource('AWS::SecretsManager::Secret', {
       Properties: Match.objectLike({
         Description: Match.stringLikeRegexp('OAuth provider client secrets'),
       }),
-      DeletionPolicy: 'Retain',
+      DeletionPolicy: 'Delete',
     });
   });
 
-  test('auth provider secrets secret has RETAIN removal policy', () => {
+  test('auth provider secrets secret has config-driven removal policy', () => {
     template.hasResource('AWS::SecretsManager::Secret', {
       Properties: Match.objectLike({
         Description: Match.stringLikeRegexp('OIDC authentication provider client secrets'),
       }),
-      DeletionPolicy: 'Retain',
+      DeletionPolicy: 'Delete',
     });
   });
 });

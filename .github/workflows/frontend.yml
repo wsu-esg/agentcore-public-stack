@@ -1,4 +1,4 @@
-name: "Step 5 — Deploy Frontend (CloudFront)"
+name: "5. Deploy Frontend (CloudFront)"
 
 on:
   push:
@@ -46,10 +46,13 @@ on:
         default: 'false'
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   # Build and Deploy Configuration (non-sensitive, repository-level)
   BUILD_CONFIG: production
   CDK_REQUIRE_APPROVAL: never
   WAIT_FOR_INVALIDATION: false
+  # Suppress repeated config dumps from load-env.sh in CI logs
+  LOAD_ENV_QUIET: true
 
 # Ensure only one deployment runs at a time
 concurrency:
@@ -57,29 +60,58 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check-stack-dependencies:
+    name: Check Stack Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Run stack dependency tests
+        run: |
+          bash scripts/common/test-stack-dependencies.sh
+
   install:
     name: Install Dependencies
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      - name: Restore frontend node_modules cache
+        id: cache-frontend
+        uses: actions/cache/restore@v5
+        with:
+          path: frontend/ai.client/node_modules
+          key: frontend-node-modules-${{ hashFiles('frontend/ai.client/package-lock.json') }}
+
+      - name: Restore CDK node_modules cache
+        id: cache-infrastructure
+        uses: actions/cache/restore@v5
+        with:
+          path: infrastructure/node_modules
+          key: infrastructure-node-modules-${{ hashFiles('infrastructure/package-lock.json') }}
 
       - name: Install system dependencies
+        if: steps.cache-frontend.outputs.cache-hit != 'true' || steps.cache-infrastructure.outputs.cache-hit != 'true'
         run: |
           bash scripts/common/install-deps.sh
 
       - name: Install frontend dependencies
+        if: steps.cache-frontend.outputs.cache-hit != 'true' || steps.cache-infrastructure.outputs.cache-hit != 'true'
         run: |
           bash scripts/stack-frontend/install.sh
 
       - name: Save frontend node_modules cache
-        uses: actions/cache/save@v4
+        if: steps.cache-frontend.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
         with:
           path: frontend/ai.client/node_modules
           key: frontend-node-modules-${{ hashFiles('frontend/ai.client/package-lock.json') }}
 
       - name: Save CDK node_modules cache
-        uses: actions/cache/save@v4
+        if: steps.cache-infrastructure.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
         with:
           path: infrastructure/node_modules
           key: infrastructure-node-modules-${{ hashFiles('infrastructure/package-lock.json') }}
@@ -87,37 +119,44 @@ jobs:
   build-frontend:
     name: Build Frontend
     runs-on: ubuntu-latest
-    needs: install
+    needs: [install, check-stack-dependencies]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Restore frontend node_modules cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: frontend/ai.client/node_modules
           key: frontend-node-modules-${{ hashFiles('frontend/ai.client/package-lock.json') }}
 
       - name: Build Frontend application
+        id: build-app
         run: |
           bash scripts/stack-frontend/build.sh
 
       - name: Upload Frontend build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: frontend-build
           path: frontend/ai.client/dist/
           retention-days: 7
 
+      - name: Save Frontend build cache
+        uses: actions/cache/save@v5
+        with:
+          path: frontend/ai.client/dist
+          key: frontend-build-${{ hashFiles('frontend/ai.client/src/**', 'frontend/ai.client/angular.json', 'frontend/ai.client/tsconfig.json') }}
+
   build-cdk:
     name: Build CDK
     runs-on: ubuntu-latest
-    needs: install
+    needs: [install, check-stack-dependencies]
     outputs:
       app-version: ${{ steps.read-version.outputs.APP_VERSION }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Read VERSION file
         id: read-version
@@ -127,7 +166,7 @@ jobs:
           echo "App version: ${APP_VERSION}"
 
       - name: Restore CDK node_modules cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: infrastructure/node_modules
           key: infrastructure-node-modules-${{ hashFiles('infrastructure/package-lock.json') }}
@@ -143,20 +182,21 @@ jobs:
     if: ${{ github.event.inputs.skip_tests != 'true' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Restore frontend node_modules cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: frontend/ai.client/node_modules
           key: frontend-node-modules-${{ hashFiles('frontend/ai.client/package-lock.json') }}
 
       - name: Run Frontend tests
+        id: run-tests
         run: |
           bash scripts/stack-frontend/test.sh
 
       - name: Upload Frontend test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: frontend-test-results
           path: frontend/ai.client/coverage/
@@ -196,10 +236,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Restore CDK node_modules cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: infrastructure/node_modules
           key: infrastructure-node-modules-${{ hashFiles('infrastructure/package-lock.json') }}
@@ -222,7 +262,7 @@ jobs:
           bash scripts/stack-frontend/synth.sh
 
       - name: Upload synthesized templates
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: frontend-cdk-synth
           path: infrastructure/cdk.out/
@@ -254,16 +294,16 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Restore CDK node_modules cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: infrastructure/node_modules
           key: infrastructure-node-modules-${{ hashFiles('infrastructure/package-lock.json') }}
 
       - name: Download synthesized templates
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: frontend-cdk-synth
           path: infrastructure/cdk.out/
@@ -282,6 +322,7 @@ jobs:
           bash scripts/common/install-deps.sh
 
       - name: Validate CloudFormation template
+        id: run-tests
         run: |
           bash scripts/stack-frontend/test-cdk.sh
 
@@ -323,16 +364,16 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Restore CDK node_modules cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: infrastructure/node_modules
           key: infrastructure-node-modules-${{ hashFiles('infrastructure/package-lock.json') }}
 
       - name: Download synthesized templates
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: frontend-cdk-synth
           path: infrastructure/cdk.out/
@@ -355,7 +396,7 @@ jobs:
           bash scripts/stack-frontend/deploy-cdk.sh
       
       - name: Upload stack outputs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: frontend-cdk-outputs
           path: infrastructure/frontend-outputs.json
@@ -393,13 +434,19 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4      
+        uses: actions/checkout@v5      
       
       - name: Download Frontend build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: frontend-build
           path: frontend/ai.client/dist/
+
+      - name: Download CDK outputs
+        uses: actions/download-artifact@v7
+        with:
+          name: frontend-cdk-outputs
+          path: infrastructure/
 
       - name: Configure AWS credentials
         uses: ./.github/actions/configure-aws-credentials
@@ -411,25 +458,27 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
       
       - name: Deploy Frontend assets
+        id: deploy-assets
         run: |
           bash scripts/stack-frontend/deploy-assets.sh
       
-      - name: Deployment summary
-        if: success()
+      - name: Generate summary
+        if: always()
         run: |
-          ENVIRONMENT="${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'production') || (github.ref == 'refs/heads/develop' && 'development') || 'development' }}"
-          
-          echo "## Frontend Deployment Complete! 🚀" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment**: ${ENVIRONMENT}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Region**: ${CDK_AWS_REGION}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Project**: ${CDK_PROJECT_PREFIX}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Stack**: FrontendStack" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Runtime Configuration" >> $GITHUB_STEP_SUMMARY
-          echo "- **Production Mode**: ${CDK_PRODUCTION}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Configuration Source**: Runtime (config.json generated from SSM parameters)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Backend URLs**: Automatically resolved from infrastructure stack outputs" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Note:** CloudFront cache invalidation is in progress. Changes may take 5-15 minutes to propagate globally." >> $GITHUB_STEP_SUMMARY
+          source scripts/common/summary.sh
+
+          if [ "${{ job.status }}" = "success" ]; then
+            STATUS="success"
+          else
+            STATUS="failure"
+          fi
+
+          # --- Workflow header (once for the entire workflow) ---
+          write_workflow_header "Frontend" "$STATUS" "FrontendStack"
+
+          # --- Stack outputs or failure details ---
+          if [ "$STATUS" = "success" ]; then
+            write_cdk_outputs_table "infrastructure/frontend-outputs.json"
+          else
+            write_failure_summary "Deploy Assets" "1" "Asset deployment failed — check logs above"
+          fi

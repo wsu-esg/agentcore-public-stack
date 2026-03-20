@@ -5,7 +5,7 @@ import logging
 import base64
 import json
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 from apis.shared.users.repository import UserRepository
 from apis.shared.users.models import UserProfile, UserListItem
@@ -135,7 +135,7 @@ class UserAdminService:
             return None
 
         # Parallel fetch of related data
-        current_period = datetime.utcnow().strftime("%Y-%m")
+        current_period = datetime.now(timezone.utc).strftime("%Y-%m")
 
         # Create a mock User object for quota resolution
         user = User(

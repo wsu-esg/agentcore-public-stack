@@ -6,16 +6,35 @@ Provides a direct Bedrock Converse API wrapper authenticated via API keys
 - Streaming (SSE) and non-streaming responses
 - Reasoning models (extended thinking / reasoning content blocks)
 - Multiple Bedrock model IDs
+
+RBAC model access is enforced via ``AppRoleService.can_access_model()``
+before any Bedrock invocation occurs. Requests for models the caller's
+role does not permit are rejected with HTTP 403.
 """
 
 import json
 import logging
 import os
+from datetime import datetime, timezone
 from typing import AsyncGenerator
 
 import boto3
+from botocore.exceptions import ClientError as BotoClientError
 from fastapi import APIRouter, Header, HTTPException, status
 from fastapi.responses import StreamingResponse
+
+from apis.shared.auth.models import User
+from apis.shared import quota as shared_quota
+from apis.shared.rbac.service import get_app_role_service
+from apis.app_api.costs.calculator import CostCalculator
+from apis.app_api.costs.pricing_config import create_pricing_snapshot
+from apis.shared.sessions.metadata import store_message_metadata
+from apis.shared.sessions.models import (
+    MessageMetadata,
+    TokenUsage,
+    ModelInfo,
+    Attribution,
+)
 
 from .models import ConverseRequest, ConverseResponse
 
@@ -45,6 +64,71 @@ async def _validate_api_key(api_key: str):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _build_user_from_api_key(validated_key) -> User:
+    """Construct a minimal User from a ValidatedApiKey for quota checking."""
+    return User(
+        email=f"{validated_key.user_id}@api-key",
+        user_id=validated_key.user_id,
+        name=validated_key.name,
+        roles=["user"],
+    )
+
+async def _record_cost(user_id: str, model_id: str, usage: dict, key_id: str) -> None:
+    """Calculate and store cost metadata for an api-converse request.
+
+    Fail-open: any error is logged but never re-raised so the caller's
+    response is not blocked.
+    """
+    try:
+        pricing = await create_pricing_snapshot(model_id)
+        if pricing is None:
+            logger.warning(
+                f"No pricing snapshot for model {model_id}; skipping cost recording"
+            )
+            return
+
+        total_cost, breakdown = CostCalculator.calculate_message_cost(usage, pricing)
+
+        token_usage = TokenUsage(
+            inputTokens=usage.get("inputTokens", 0),
+            outputTokens=usage.get("outputTokens", 0),
+            totalTokens=usage.get("inputTokens", 0) + usage.get("outputTokens", 0),
+            cacheReadInputTokens=usage.get("cacheReadInputTokens"),
+            cacheWriteInputTokens=usage.get("cacheWriteInputTokens"),
+        )
+
+        model_info = ModelInfo(
+            modelId=model_id,
+            modelName=model_id,
+            provider="bedrock",
+        )
+
+        attribution = Attribution(
+            userId=user_id,
+            sessionId=f"api-converse-{key_id}",
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+
+        metadata = MessageMetadata(
+            token_usage=token_usage,
+            model_info=model_info,
+            attribution=attribution,
+            cost=total_cost,
+        )
+
+        await store_message_metadata(
+            session_id=f"api-converse-{key_id}",
+            user_id=user_id,
+            message_id=0,
+            message_metadata=metadata,
+        )
+    except Exception as exc:
+        logger.error(
+            f"Failed to record cost for user {user_id}, model {model_id}: {exc}",
+            exc_info=True,
+        )
+
 
 def _get_bedrock_client():
     """Return a boto3 bedrock-runtime client."""
@@ -112,20 +196,22 @@ def _extract_reasoning_and_text(content_blocks: list) -> tuple[str, str | None]:
 # Streaming helpers
 # ---------------------------------------------------------------------------
 
-async def _stream_converse(request: ConverseRequest) -> AsyncGenerator[str, None]:
+async def _stream_converse(request: ConverseRequest, user_id: str, key_id: str) -> AsyncGenerator[str, None]:
     """Call Bedrock converse_stream and yield SSE events."""
     client = _get_bedrock_client()
     params = _build_converse_params(request)
 
     try:
         response = client.converse_stream(**params)
-    except client.exceptions.ClientError as exc:
-        yield _sse("error", {"error": str(exc)})
+    except BotoClientError as exc:
+        error_code = exc.response["Error"]["Code"]
+        logger.error(f"Bedrock converse_stream ClientError ({error_code})", exc_info=True)
+        yield _sse("error", {"error": "Model invocation failed due to a service error."})
         yield _sse("done", {})
         return
-    except Exception as exc:
-        logger.error(f"Bedrock converse_stream error: {exc}", exc_info=True)
-        yield _sse("error", {"error": str(exc)})
+    except Exception:
+        logger.error("Bedrock converse_stream error", exc_info=True)
+        yield _sse("error", {"error": "Model invocation failed due to an internal error."})
         yield _sse("done", {})
         return
 
@@ -137,6 +223,7 @@ async def _stream_converse(request: ConverseRequest) -> AsyncGenerator[str, None
 
     # Track state for SSE lifecycle events
     in_reasoning = False
+    accumulated_usage: dict = {}
 
     for event in stream:
         # --- message start ---
@@ -202,10 +289,21 @@ async def _stream_converse(request: ConverseRequest) -> AsyncGenerator[str, None
         elif "metadata" in event:
             meta = event["metadata"]
             usage = meta.get("usage", {})
+            accumulated_usage = usage
             metrics = meta.get("metrics", {})
             yield _sse("metadata", {"usage": usage, "metrics": metrics})
 
     yield _sse("done", {})
+
+    # Record cost after stream completes
+    if accumulated_usage:
+        await _record_cost(
+            user_id=user_id,
+            model_id=request.model_id,
+            usage=accumulated_usage,
+            key_id=key_id,
+        )
+
 
 
 def _sse(event_type: str, data: dict) -> str:
@@ -244,14 +342,72 @@ async def api_converse(
         f"messages={len(request.messages)} stream={request.stream}"
     )
 
+    # 1.5 Per-key rate limit (fail-open)
+    from apis.shared.rate_limit import get_rate_limiter
+
+    try:
+        limiter = get_rate_limiter()
+        if not await limiter.check_rate_limit(validated_key.key_id):
+            logger.warning(
+                f"Rate limit exceeded for key {validated_key.key_id} "
+                f"(user={validated_key.user_id})"
+            )
+            raise HTTPException(
+                status_code=429,
+                detail="Rate limit exceeded. Max 60 requests per minute.",
+                headers={"Retry-After": "60"},
+            )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Rate limit check error: {exc}", exc_info=True)
+
     # 2. Basic validation
     if not request.messages:
         raise HTTPException(status_code=400, detail="messages array must not be empty")
 
+    # 2.5 Build User and synthetic session_id for quota / cost accounting
+    user = _build_user_from_api_key(validated_key)
+    session_id = f"api-converse-{validated_key.key_id}"
+
+    # 2.6 Quota check (fail-open: errors are logged but don't block the request)
+    if shared_quota.is_quota_enforcement_enabled():
+        try:
+            quota_checker = shared_quota.get_quota_checker()
+            quota_result = await quota_checker.check_quota(user=user, session_id=session_id)
+            if not quota_result.allowed:
+                if quota_result.quota_limit is None:
+                    # No quota tier configured for this API-key user — fail-open
+                    # per Requirement 3.6 (don't block on internal/config issues)
+                    logger.warning(
+                        f"No quota tier for user {validated_key.user_id}; "
+                        f"proceeding (fail-open)"
+                    )
+                else:
+                    logger.warning(
+                        f"Quota exceeded for user {validated_key.user_id}: {quota_result.message}"
+                    )
+                    raise HTTPException(status_code=429, detail=quota_result.message)
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.error(
+                f"Error checking quota for user {validated_key.user_id}: {exc}",
+                exc_info=True,
+            )
+
+    # 2.7 Model access check (RBAC)
+    app_role_service = get_app_role_service()
+    if not await app_role_service.can_access_model(user, request.model_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Access denied to model: {request.model_id}",
+        )
+
     # 3. Streaming path
     if request.stream:
         return StreamingResponse(
-            _stream_converse(request),
+            _stream_converse(request, user_id=validated_key.user_id, key_id=validated_key.key_id),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
@@ -265,9 +421,27 @@ async def api_converse(
 
     try:
         response = client.converse(**params)
-    except Exception as exc:
-        logger.error(f"Bedrock converse error: {exc}", exc_info=True)
-        raise HTTPException(status_code=502, detail=f"Model invocation failed: {exc}")
+    except BotoClientError as exc:
+        error_code = exc.response["Error"]["Code"]
+        if error_code == "ThrottlingException":
+            logger.warning("Bedrock throttling on converse call", exc_info=True)
+            raise HTTPException(
+                status_code=429,
+                detail="Model is temporarily overloaded. Please retry shortly.",
+                headers={"Retry-After": "5"},
+            )
+        logger.error(f"Bedrock ClientError ({error_code}) on converse call", exc_info=True)
+        if error_code in ("ValidationException", "ModelErrorException"):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid request — check model ID, message format, and content policy.",
+            )
+        if error_code == "AccessDeniedException":
+            raise HTTPException(status_code=403, detail="Model access is not available.")
+        raise HTTPException(status_code=502, detail="Model invocation failed due to a service error.")
+    except Exception:
+        logger.error("Unexpected error during Bedrock converse call", exc_info=True)
+        raise HTTPException(status_code=502, detail="Model invocation failed due to an internal error.")
 
     # Parse response
     output = response.get("output", {})
@@ -278,6 +452,15 @@ async def api_converse(
 
     usage = response.get("usage")
     stop_reason = response.get("stopReason")
+
+    # Record cost for non-streaming response
+    if usage is not None:
+        await _record_cost(
+            user_id=validated_key.user_id,
+            model_id=request.model_id,
+            usage=usage,
+            key_id=validated_key.key_id,
+        )
 
     return ConverseResponse(
         content=text,

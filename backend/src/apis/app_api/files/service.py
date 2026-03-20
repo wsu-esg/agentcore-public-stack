@@ -7,7 +7,7 @@ Business logic for file uploads with S3 pre-signed URLs and quota management.
 import os
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Tuple
 
 import boto3
@@ -184,7 +184,7 @@ class FileUploadService:
 
         # Generate upload ID (timestamp-prefixed UUID for sortable uniqueness)
         # Format: {timestamp_hex}_{uuid} for chronological sorting
-        timestamp_hex = format(int(datetime.utcnow().timestamp() * 1000), 'x')
+        timestamp_hex = format(int(datetime.now(timezone.utc).timestamp() * 1000), 'x')
         upload_id = f"{timestamp_hex}_{uuid.uuid4().hex[:16]}"
 
         # Build S3 key
@@ -224,7 +224,7 @@ class FileUploadService:
             logger.error(f"Failed to generate pre-signed URL: {e}")
             raise
 
-        expires_at = (datetime.utcnow() + timedelta(seconds=self.presign_expiration)).isoformat() + "Z"
+        expires_at = (datetime.now(timezone.utc) + timedelta(seconds=self.presign_expiration)).isoformat() + "Z"
 
         logger.info(f"Generated pre-signed URL for upload {upload_id} by user {user_id}")
 

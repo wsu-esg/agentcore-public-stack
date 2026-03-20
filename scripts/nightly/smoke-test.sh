@@ -27,6 +27,12 @@ log_success() {
 
 # Get ALB URL from CDK outputs
 get_alb_url() {
+    # Prefer the custom HTTPS subdomain when configured (avoids HTTP 301 redirect)
+    if [ -n "${CDK_ALB_SUBDOMAIN:-}" ] && [ -n "${CDK_HOSTED_ZONE_DOMAIN:-}" ]; then
+        echo "https://${CDK_ALB_SUBDOMAIN}.${CDK_HOSTED_ZONE_DOMAIN}"
+        return 0
+    fi
+
     local stack_name="${CDK_PROJECT_PREFIX}-InfrastructureStack"
     local alb_dns=$(aws cloudformation describe-stacks \
         --stack-name "${stack_name}" \
@@ -39,25 +45,34 @@ get_alb_url() {
         return 1
     fi
     
-    echo "http://${alb_dns}"
+    echo "https://${alb_dns}"
 }
 
-# Test health endpoint
+# Test health endpoint with retries
 test_health_endpoint() {
     local url="$1"
     local name="$2"
+    local max_retries="${3:-20}"
+    local retry_interval="${4:-15}"
     
     log_info "Testing ${name}: ${url}"
     
-    local response_code=$(curl -s -o /dev/null -w "%{http_code}" "${url}" --max-time 30)
-    
-    if [ "${response_code}" = "200" ]; then
-        log_success "${name} health check passed (HTTP ${response_code})"
-        return 0
-    else
-        log_error "${name} health check failed (HTTP ${response_code})"
-        return 1
-    fi
+    for i in $(seq 1 ${max_retries}); do
+        local response_code=$(curl -s -o /dev/null -w "%{http_code}" "${url}" --max-time 30)
+        
+        if [ "${response_code}" = "200" ]; then
+            log_success "${name} health check passed (HTTP ${response_code})"
+            return 0
+        fi
+        
+        if [ ${i} -lt ${max_retries} ]; then
+            log_info "${name} not ready (HTTP ${response_code}), retrying in ${retry_interval}s... (${i}/${max_retries})"
+            sleep ${retry_interval}
+        else
+            log_error "${name} health check failed after ${max_retries} attempts (last HTTP ${response_code})"
+            return 1
+        fi
+    done
 }
 
 main() {
@@ -82,13 +97,16 @@ main() {
     ALB_URL=$(get_alb_url)
     log_info "ALB URL: ${ALB_URL}"
     
-    # Test App API health endpoint (port 8000)
-    test_health_endpoint "${ALB_URL}:8000/health" "App API"
+    # Test App API health endpoint (via ALB on standard HTTP port)
+    test_health_endpoint "${ALB_URL}/health" "App API"
     APP_API_RESULT=$?
     
-    # Test Inference API health endpoint (port 8001)
-    test_health_endpoint "${ALB_URL}:8001/health" "Inference API"
-    INFERENCE_API_RESULT=$?
+    # Test Inference API
+    # Note: Inference API runs on AgentCore Runtime (managed Bedrock service),
+    # not behind the ALB. It is not reachable via a public HTTP endpoint.
+    # Skipping direct health check — runtime health is managed by AgentCore.
+    log_info "Skipping Inference API health check (AgentCore Runtime — not exposed via ALB)"
+    INFERENCE_API_RESULT=0
     
     # Check results
     if [ ${APP_API_RESULT} -eq 0 ] && [ ${INFERENCE_API_RESULT} -eq 0 ]; then

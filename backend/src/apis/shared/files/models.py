@@ -5,7 +5,7 @@ Pydantic models for file upload metadata, requests, and responses.
 Supports the pre-signed URL upload flow for S3.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional
 import time
@@ -104,8 +104,8 @@ class FileMetadata(BaseModel):
     status: FileStatus = Field(default=FileStatus.PENDING)
 
     # Timestamps
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # TTL for DynamoDB (365 days from creation)
     ttl: Optional[int] = Field(None, description="Unix epoch for TTL expiration")
@@ -165,8 +165,8 @@ class FileMetadata(BaseModel):
             s3_key=item.get("s3Key", ""),
             s3_bucket=item.get("s3Bucket", ""),
             status=item.get("status", FileStatus.PENDING),
-            created_at=datetime.fromisoformat(created_at.rstrip("Z")) if created_at else datetime.utcnow(),
-            updated_at=datetime.fromisoformat(updated_at.rstrip("Z")) if updated_at else datetime.utcnow(),
+            created_at=datetime.fromisoformat(created_at.rstrip("Z")) if created_at else datetime.now(timezone.utc),
+            updated_at=datetime.fromisoformat(updated_at.rstrip("Z")) if updated_at else datetime.now(timezone.utc),
             ttl=item.get("ttl"),
         )
 
@@ -183,7 +183,7 @@ class UserFileQuota(BaseModel):
     user_id: str
     total_bytes: int = Field(default=0, description="Current usage in bytes")
     file_count: int = Field(default=0, description="Total number of files")
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_dynamo_item(self) -> dict:
         """Convert to DynamoDB item format."""
@@ -204,7 +204,7 @@ class UserFileQuota(BaseModel):
             user_id=item.get("userId", ""),
             total_bytes=int(item.get("totalBytes", 0)),
             file_count=int(item.get("fileCount", 0)),
-            updated_at=datetime.fromisoformat(updated_at.rstrip("Z")) if updated_at else datetime.utcnow(),
+            updated_at=datetime.fromisoformat(updated_at.rstrip("Z")) if updated_at else datetime.now(timezone.utc),
         )
 
 

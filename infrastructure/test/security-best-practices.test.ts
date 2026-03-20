@@ -243,18 +243,16 @@ describe('Non-production removal policies', () => {
     const buckets = findResourcesAcrossStacks('AWS::S3::Bucket');
     expect(buckets.length).toBeGreaterThan(0);
 
-    // Some document-storage buckets are intentionally always-RETAIN for data
-    // safety regardless of the retainDataOnDelete flag. Verify that the
-    // config-driven mechanism works: at least one bucket should use Delete.
+    // All S3 buckets should now be config-driven via getRemovalPolicy().
+    // When retainDataOnDelete is false, every bucket should use Delete.
     const deleteBuckets = buckets.filter((b) => b.resource['DeletionPolicy'] === 'Delete');
     const retainBuckets = buckets.filter((b) => b.resource['DeletionPolicy'] === 'Retain');
 
     expect(deleteBuckets.length).toBeGreaterThan(0);
 
-    // Every bucket should be either Delete (config-driven) or Retain
-    // (hardcoded for data-safety). No other policy should appear.
+    // Every bucket should be Delete when retainDataOnDelete is false.
     for (const { stackName, logicalId, resource } of buckets) {
-      expect(['Delete', 'Retain']).toContain(resource['DeletionPolicy']);
+      expect(resource['DeletionPolicy']).toBe('Delete');
     }
   });
 

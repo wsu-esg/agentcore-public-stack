@@ -4,7 +4,7 @@ Provides endpoints for retrieving user cost summaries and detailed reports.
 """
 
 from fastapi import APIRouter, Depends, Query, HTTPException
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import logging
 
@@ -47,7 +47,7 @@ async def get_cost_summary(
 
     # Default to current month
     if not period:
-        period = datetime.utcnow().strftime("%Y-%m")
+        period = datetime.now(timezone.utc).strftime("%Y-%m")
 
     logger.info(f"GET /costs/summary - User: {user_id}, Period: {period}")
 

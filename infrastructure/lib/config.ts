@@ -19,6 +19,7 @@ export interface AppConfig {
   assistants: AssistantsConfig;
   fileUpload: FileUploadConfig;
   ragIngestion: RagIngestionConfig;
+  fineTuning: FineTuningConfig;
   appVersion: string;
   tags: { [key: string]: string };
 }
@@ -84,6 +85,10 @@ export interface RagIngestionConfig {
   vectorDistanceMetric: string;  // Distance metric (default: "cosine")
 }
 
+export interface FineTuningConfig {
+  enabled: boolean;              // Enable/disable SageMaker Fine-Tuning stack
+}
+
 /**
  * Load and validate configuration from CDK context
  * @param scope The CDK construct scope
@@ -129,8 +134,12 @@ export function loadConfig(scope: cdk.App): AppConfig {
   validateAwsAccount(awsAccount);
   validateAwsRegion(awsRegion);
 
-  // Top-level shared CORS origins — used as default for sections that don't override
-  const corsOrigins = process.env.CDK_CORS_ORIGINS || scope.node.tryGetContext('corsOrigins') || '';
+  // Top-level shared CORS origins — used as default for sections that don't override.
+  // If not explicitly set, auto-derive from CDK_DOMAIN_NAME so callers only need one variable.
+  const domainName = process.env.CDK_DOMAIN_NAME || scope.node.tryGetContext('domainName');
+  const corsOrigins = process.env.CDK_CORS_ORIGINS
+    || scope.node.tryGetContext('corsOrigins')
+    || (domainName ? `https://${domainName}` : '');
 
   // Load app version from environment variable or CDK context
   const appVersion = process.env.CDK_APP_VERSION || scope.node.tryGetContext('appVersion') || 'unknown';
@@ -144,7 +153,7 @@ export function loadConfig(scope: cdk.App): AppConfig {
     retainDataOnDelete: parseBooleanEnv(process.env.CDK_RETAIN_DATA_ON_DELETE) ?? scope.node.tryGetContext('retainDataOnDelete'),
     vpcCidr: scope.node.tryGetContext('vpcCidr'),
     corsOrigins,
-    domainName: process.env.CDK_DOMAIN_NAME || scope.node.tryGetContext('domainName'),
+    domainName,
     infrastructureHostedZoneDomain: process.env.CDK_HOSTED_ZONE_DOMAIN || scope.node.tryGetContext('infrastructureHostedZoneDomain'),
     albSubdomain: process.env.CDK_ALB_SUBDOMAIN || scope.node.tryGetContext('albSubdomain'),
     certificateArn: process.env.CDK_CERTIFICATE_ARN || scope.node.tryGetContext('certificateArn'),
@@ -202,6 +211,9 @@ export function loadConfig(scope: cdk.App): AppConfig {
       vectorDimension: parseIntEnv(process.env.CDK_RAG_VECTOR_DIMENSION) || scope.node.tryGetContext('ragIngestion')?.vectorDimension,
       vectorDistanceMetric: process.env.CDK_RAG_DISTANCE_METRIC || scope.node.tryGetContext('ragIngestion')?.vectorDistanceMetric,
     },
+    fineTuning: {
+      enabled: parseBooleanEnv(process.env.CDK_FINE_TUNING_ENABLED) ?? scope.node.tryGetContext('fineTuning')?.enabled ?? false,
+    },
     tags: {
       ...(scope.node.tryGetContext('tags') || {}),
     },
@@ -220,6 +232,7 @@ export function loadConfig(scope: cdk.App): AppConfig {
   console.log(`   App API Enabled: ${config.appApi.enabled}`);
   console.log(`   Inference API Enabled: ${config.inferenceApi.enabled}`);
   console.log(`   Gateway Enabled: ${config.gateway.enabled}`);
+  console.log(`   Fine-Tuning Enabled: ${config.fineTuning.enabled}`);
   console.log(`   App Version: ${config.appVersion}`);
 
   // Validate configuration
@@ -399,11 +412,11 @@ function validateConfig(config: AppConfig): void {
 
   // Validate File Upload CORS origins
   if (config.fileUpload.enabled) {
-    const effectiveCors = config.fileUpload.corsOrigins || config.corsOrigins;
+    const effectiveCors = config.fileUpload.corsOrigins || config.corsOrigins || config.domainName;
     if (!effectiveCors || effectiveCors.trim() === '') {
       throw new Error(
         'File Upload stack requires CORS origins to be configured. ' +
-        'Set corsOrigins at the top level or in the fileUpload section.'
+        'Set CDK_DOMAIN_NAME, CDK_CORS_ORIGINS, or corsOrigins in the fileUpload section.'
       );
     }
   }

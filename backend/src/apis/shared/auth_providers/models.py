@@ -2,7 +2,7 @@
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -47,8 +47,8 @@ class AuthProvider:
     logo_url: Optional[str] = None
     button_color: Optional[str] = None
     # Metadata
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
-    updated_at: str = field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat() + "Z")
+    updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat() + "Z")
     created_by: Optional[str] = None
     # AgentCore Runtime tracking
     agentcore_runtime_arn: Optional[str] = None
@@ -167,8 +167,8 @@ class AuthProvider:
             allowed_audiences=item.get("allowedAudiences"),
             logo_url=item.get("logoUrl"),
             button_color=item.get("buttonColor"),
-            created_at=item.get("createdAt", datetime.utcnow().isoformat() + "Z"),
-            updated_at=item.get("updatedAt", datetime.utcnow().isoformat() + "Z"),
+            created_at=item.get("createdAt", datetime.now(timezone.utc).isoformat() + "Z"),
+            updated_at=item.get("updatedAt", datetime.now(timezone.utc).isoformat() + "Z"),
             created_by=item.get("createdBy"),
             agentcore_runtime_arn=item.get("agentcoreRuntimeArn"),
             agentcore_runtime_id=item.get("agentcoreRuntimeId"),

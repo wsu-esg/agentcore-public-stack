@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start"],
+      "port": 4200,
+      "cwd": "frontend/ai.client"
+    },
+    {
+      "name": "app-api",
+      "runtimeExecutable": "/Users/philmerrell/Repos/agentcore-public-stack/backend/venv/bin/python",
+      "runtimeArgs": ["main.py"],
+      "port": 8000,
+      "cwd": "backend/src/apis/app_api"
+    },
+    {
+      "name": "inference-api",
+      "runtimeExecutable": "/Users/philmerrell/Repos/agentcore-public-stack/backend/venv/bin/python",
+      "runtimeArgs": ["main.py"],
+      "port": 8001,
+      "cwd": "backend/src/apis/inference_api"
+    }
+  ]
+}

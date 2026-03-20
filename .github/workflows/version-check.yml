@@ -1,5 +1,10 @@
 name: "Version Check"
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Suppress repeated config dumps from load-env.sh in CI logs
+  LOAD_ENV_QUIET: true
+
 on:
   pull_request:
     branches:
@@ -12,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -37,6 +42,32 @@ jobs:
         run: |
           bash scripts/common/sync-version.sh --check
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Check package-lock.json files are in sync
+        id: lockfiles-synced
+        continue-on-error: true
+        run: |
+          FAILED=0
+
+          for dir in frontend/ai.client infrastructure; do
+            echo "Checking ${dir}/package-lock.json..."
+            npm install --package-lock-only --prefix "${dir}" 2>/dev/null
+            if ! git diff --exit-code "${dir}/package-lock.json" > /dev/null 2>&1; then
+              echo "::error::${dir}/package-lock.json is out of sync with ${dir}/package.json"
+              FAILED=1
+            else
+              echo "${dir}/package-lock.json is in sync."
+            fi
+          done
+
+          if [ "${FAILED}" -eq 1 ]; then
+            exit 1
+          fi
+
       - name: Evaluate results
         run: |
           FAILED=0
@@ -51,8 +82,43 @@ jobs:
             FAILED=1
           fi
 
+          if [ "${{ steps.lockfiles-synced.outcome }}" = "failure" ]; then
+            echo "::error::package-lock.json files are out of sync. Run \`bash scripts/common/sync-version.sh\` and commit the updated lockfiles."
+            FAILED=1
+          fi
+
           if [ "${FAILED}" -eq 1 ]; then
             exit 1
           fi
 
           echo "All version checks passed."
+
+      - name: Generate summary
+        if: always()
+        run: |
+          source scripts/common/summary.sh
+
+          # Map step outcomes to pass/fail
+          VB_RESULT="${{ steps.version-bumped.outcome }}"
+          MS_RESULT="${{ steps.manifests-synced.outcome }}"
+          LF_RESULT="${{ steps.lockfiles-synced.outcome }}"
+
+          if [ "${VB_RESULT}" = "success" ]; then VB_STATUS="pass"; else VB_STATUS="fail"; fi
+          if [ "${MS_RESULT}" = "success" ]; then MS_STATUS="pass"; else MS_STATUS="fail"; fi
+          if [ "${LF_RESULT}" = "success" ]; then LF_STATUS="pass"; else LF_STATUS="fail"; fi
+
+          # Determine overall status
+          if [ "${VB_STATUS}" = "pass" ] && [ "${MS_STATUS}" = "pass" ] && [ "${LF_STATUS}" = "pass" ]; then
+            STATUS="success"
+          elif [ "${VB_STATUS}" = "pass" ] || [ "${MS_STATUS}" = "pass" ] || [ "${LF_STATUS}" = "pass" ]; then
+            STATUS="partial"
+          else
+            STATUS="failure"
+          fi
+
+          # Extract old version from main and new version from PR branch
+          OLD_VERSION="$(git show origin/main:VERSION 2>/dev/null | tr -d '[:space:]' || echo "unknown")"
+          NEW_VERSION="$(tr -d '[:space:]' < VERSION || echo "unknown")"
+
+          write_workflow_header "Version Check" "${STATUS}"
+          write_version_check_summary "${VB_STATUS}" "${MS_STATUS}" "${LF_STATUS}" "${OLD_VERSION}" "${NEW_VERSION}"

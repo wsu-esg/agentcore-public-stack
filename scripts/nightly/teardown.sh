@@ -46,15 +46,19 @@ empty_bucket() {
         --bucket "${bucket_name}" \
         --output json \
         --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' \
-        | jq -r '.Objects[]? | "--key \(.Key) --version-id \(.VersionId)"' \
-        | xargs -r -n 2 aws s3api delete-object --bucket "${bucket_name}" || true
+        | jq -r '.Objects[]? | "\(.Key)\t\(.VersionId)"' \
+        | while IFS=$'\t' read -r key version_id; do
+            aws s3api delete-object --bucket "${bucket_name}" --key "${key}" --version-id "${version_id}" || true
+        done
     
     aws s3api list-object-versions \
         --bucket "${bucket_name}" \
         --output json \
         --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' \
-        | jq -r '.Objects[]? | "--key \(.Key) --version-id \(.VersionId)"' \
-        | xargs -r -n 2 aws s3api delete-object --bucket "${bucket_name}" || true
+        | jq -r '.Objects[]? | "\(.Key)\t\(.VersionId)"' \
+        | while IFS=$'\t' read -r key version_id; do
+            aws s3api delete-object --bucket "${bucket_name}" --key "${key}" --version-id "${version_id}" || true
+        done
     
     # Delete all objects (non-versioned)
     aws s3 rm "s3://${bucket_name}" --recursive || true
@@ -105,18 +109,115 @@ force_delete_secrets() {
     done
 }
 
-# Destroy CDK stacks
+# Delete all CloudWatch log groups containing the project prefix anywhere in the name
+delete_cloudwatch_logs() {
+    log_info "Deleting CloudWatch log groups containing: ${CDK_PROJECT_PREFIX}"
+
+    # Log groups can be under /aws/ecs/, /aws/lambda/, etc. — prefix search won't catch them.
+    # Paginate through all log groups and filter by project prefix in the name.
+    local next_token=""
+    local log_groups=()
+
+    while true; do
+        local response
+        if [ -n "${next_token}" ]; then
+            response=$(aws logs describe-log-groups \
+                --next-token "${next_token}" \
+                --limit 50 \
+                --output json \
+                --region "${CDK_AWS_REGION}" 2>/dev/null || echo '{}')
+        else
+            response=$(aws logs describe-log-groups \
+                --limit 50 \
+                --output json \
+                --region "${CDK_AWS_REGION}" 2>/dev/null || echo '{}')
+        fi
+
+        local page_groups
+        page_groups=$(echo "${response}" | jq -r \
+            --arg prefix "${CDK_PROJECT_PREFIX}" \
+            '.logGroups[]?.logGroupName | select(contains($prefix))' 2>/dev/null || true)
+
+        while IFS= read -r group; do
+            [ -n "${group}" ] && log_groups+=("${group}")
+        done <<< "${page_groups}"
+
+        next_token=$(echo "${response}" | jq -r '.nextToken // empty' 2>/dev/null || true)
+        [ -z "${next_token}" ] && break
+    done
+
+    if [ ${#log_groups[@]} -eq 0 ]; then
+        log_info "No CloudWatch log groups found containing ${CDK_PROJECT_PREFIX}"
+        return 0
+    fi
+
+    log_info "Found ${#log_groups[@]} log group(s) to delete"
+
+    for log_group in "${log_groups[@]}"; do
+        log_info "Deleting log group: ${log_group}"
+        aws logs delete-log-group \
+            --log-group-name "${log_group}" \
+            --region "${CDK_AWS_REGION}" 2>/dev/null && \
+            log_success "Deleted ${log_group}" || \
+            log_warn "Failed to delete ${log_group}, skipping"
+    done
+
+    log_success "CloudWatch log group cleanup complete"
+}
+
+# Delete S3 Vector Buckets (not visible via standard s3api list-buckets)
+delete_vector_buckets() {
+    log_info "Finding S3 Vector Buckets with prefix: ${CDK_PROJECT_PREFIX}"
+
+    local vector_buckets
+    vector_buckets=$(aws s3vectors list-vector-buckets \
+        --region "${CDK_AWS_REGION}" \
+        --output json \
+        --query "vectorBuckets[?starts_with(vectorBucketName, '${CDK_PROJECT_PREFIX}')].vectorBucketName" \
+        2>/dev/null | jq -r '.[]?' || true)
+
+    if [ -z "${vector_buckets}" ]; then
+        log_info "No S3 Vector Buckets found with prefix ${CDK_PROJECT_PREFIX}"
+        return 0
+    fi
+
+    log_info "Found vector buckets: ${vector_buckets}"
+
+    while IFS= read -r vbucket; do
+        [ -z "${vbucket}" ] && continue
+        log_info "Deleting vector bucket: ${vbucket}"
+        aws s3vectors delete-vector-bucket \
+            --vector-bucket-name "${vbucket}" \
+            --region "${CDK_AWS_REGION}" 2>/dev/null && \
+            log_success "Vector bucket ${vbucket} deleted" || \
+            log_warn "Failed to delete vector bucket ${vbucket}, skipping"
+    done <<< "${vector_buckets}"
+
+    log_success "All S3 Vector Buckets deleted"
+}
+
+# Destroy CDK stacks in reverse dependency order
 destroy_stacks() {
-    log_info "Destroying CDK stacks with prefix: ${CDK_PROJECT_PREFIX}"
-    
+    log_info "Destroying CDK stacks in reverse order..."
+
     cd "${PROJECT_ROOT}/infrastructure"
-    
-    # Destroy all stacks (order doesn't matter with --force)
-    npx cdk destroy --all --force || {
-        log_error "CDK destroy failed, but continuing..."
-        return 1
-    }
-    
+
+    local stacks=(
+        "FrontendStack"
+        "GatewayStack"
+        "AppApiStack"
+        "InferenceApiStack"
+        "RagIngestionStack"
+        "InfrastructureStack"
+    )
+
+    for stack in "${stacks[@]}"; do
+        log_info "Destroying ${stack}..."
+        npx cdk destroy "${stack}" --force 2>/dev/null && \
+            log_success "${stack} destroyed" || \
+            log_warn "${stack} not found or already destroyed, skipping"
+    done
+
     log_success "All CDK stacks destroyed"
 }
 
@@ -139,6 +240,9 @@ main() {
     
     # Empty S3 buckets first
     empty_nightly_buckets
+
+    # Delete S3 Vector Buckets (not listed by standard s3api, must use s3vectors API)
+    delete_vector_buckets
     
     # Force-delete Secrets Manager secrets before CDK destroy
     # CloudFormation only schedules secrets for deletion (7-day recovery window),
@@ -147,6 +251,9 @@ main() {
     
     # Destroy CDK stacks
     destroy_stacks
+
+    # Delete CloudWatch log groups after CDK destroy (CDK may recreate them during destroy)
+    delete_cloudwatch_logs
     
     log_success "Nightly deployment teardown complete!"
 }

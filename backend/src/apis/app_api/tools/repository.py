@@ -7,7 +7,7 @@ Uses the same table as AppRoles with different PK patterns.
 
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 
 import boto3
@@ -151,7 +151,7 @@ class ToolCatalogRepository:
                 raise ValueError(f"Tool '{tool.tool_id}' already exists")
 
             # Set timestamps
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             tool.created_at = now
             tool.updated_at = now
 
@@ -196,7 +196,7 @@ class ToolCatalogRepository:
                     setattr(existing, field, value)
 
             # Update audit fields
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now(timezone.utc)
             if admin_user_id:
                 existing.updated_by = admin_user_id
 
@@ -309,7 +309,7 @@ class ToolCatalogRepository:
 
             # Merge preferences
             existing.tool_preferences.update(preferences)
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now(timezone.utc)
 
             # Save
             item = existing.to_dynamo_item()
@@ -339,7 +339,7 @@ class ToolCatalogRepository:
             pref = UserToolPreference(
                 user_id=user_id,
                 tool_preferences=preferences,
-                updated_at=datetime.utcnow(),
+                updated_at=datetime.now(timezone.utc),
             )
 
             item = pref.to_dynamo_item()
@@ -435,7 +435,7 @@ class ToolCatalogRepository:
             return []
 
         try:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
 
             with self._table.batch_writer() as batch:
                 for tool in tools:

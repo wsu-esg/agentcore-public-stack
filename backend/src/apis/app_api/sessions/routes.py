@@ -6,7 +6,7 @@ Provides endpoints for managing session metadata.
 from fastapi import APIRouter, HTTPException, Depends, Query, Response, BackgroundTasks
 from typing import Optional
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from apis.shared.sessions.models import (
     UpdateSessionMetadataRequest,
     SessionMetadataResponse,
@@ -181,7 +181,7 @@ async def update_session_metadata_endpoint(
 
         if not existing_metadata:
             # Create new session metadata with defaults
-            now = datetime.utcnow().isoformat() + "Z"
+            now = datetime.now(timezone.utc).isoformat() + "Z"
 
             # Build preferences if any preference fields are provided
             preferences = None

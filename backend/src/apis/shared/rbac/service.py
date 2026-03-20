@@ -2,7 +2,7 @@
 
 import logging
 from typing import List, Set, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from apis.shared.auth.models import User
 
@@ -130,7 +130,7 @@ class AppRoleService:
                 tools=[],
                 models=[],
                 quota_tier=None,
-                resolved_at=datetime.utcnow().isoformat() + "Z",
+                resolved_at=datetime.now(timezone.utc).isoformat() + "Z",
             )
 
         # Collect all tools and models (union)
@@ -167,7 +167,7 @@ class AppRoleService:
             tools=list(all_tools),
             models=list(all_models),
             quota_tier=quota_tier,
-            resolved_at=datetime.utcnow().isoformat() + "Z",
+            resolved_at=datetime.now(timezone.utc).isoformat() + "Z",
         )
 
     async def can_access_tool(self, user: User, tool_id: str) -> bool:

@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import AsyncMock, patch
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import HTTPException
 
@@ -27,7 +27,7 @@ def _perms(app_roles: list) -> UserEffectivePermissions:
         tools=[],
         models=[],
         quota_tier=None,
-        resolved_at=datetime.utcnow().isoformat() + "Z",
+        resolved_at=datetime.now(timezone.utc).isoformat() + "Z",
     )
 
 

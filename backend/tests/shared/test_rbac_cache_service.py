@@ -1,7 +1,7 @@
 """RBAC cache + service tests (pure logic, no AWS)."""
 
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 
@@ -119,7 +119,7 @@ class TestAppRoleCache:
     def test_get_stats_with_expired(self):
         from apis.shared.rbac.cache import CacheEntry
         self.cache._role_cache["role:old"] = CacheEntry(
-            value=MagicMock(), expires_at=datetime.utcnow() - timedelta(seconds=10)
+            value=MagicMock(), expires_at=datetime.now(timezone.utc) - timedelta(seconds=10)
         )
         stats = self.cache.get_stats()
         assert stats["roleCacheExpired"] == 1
@@ -128,12 +128,12 @@ class TestAppRoleCache:
 class TestCacheEntry:
     def test_is_expired_false(self):
         from apis.shared.rbac.cache import CacheEntry
-        e = CacheEntry(value="x", expires_at=datetime.utcnow() + timedelta(hours=1))
+        e = CacheEntry(value="x", expires_at=datetime.now(timezone.utc) + timedelta(hours=1))
         assert e.is_expired is False
 
     def test_is_expired_true(self):
         from apis.shared.rbac.cache import CacheEntry
-        e = CacheEntry(value="x", expires_at=datetime.utcnow() - timedelta(seconds=1))
+        e = CacheEntry(value="x", expires_at=datetime.now(timezone.utc) - timedelta(seconds=1))
         assert e.is_expired is True
 
 

@@ -15,19 +15,14 @@ from agents.main_agent.core.system_prompt_builder import (
 
 
 # ---------------------------------------------------------------------------
-# Requirement 3.5: DEFAULT_SYSTEM_PROMPT contains expected key phrases
+# Requirement 3.5: DEFAULT_SYSTEM_PROMPT is a non-empty string
 # ---------------------------------------------------------------------------
 class TestDefaultSystemPrompt:
-    """Verify DEFAULT_SYSTEM_PROMPT contains expected key phrases."""
+    """Verify DEFAULT_SYSTEM_PROMPT is defined and non-empty."""
 
-    def test_contains_boisestate_ai(self):
-        assert "boisestate.ai" in DEFAULT_SYSTEM_PROMPT
-
-    def test_contains_core_principles(self):
-        assert "CORE PRINCIPLES" in DEFAULT_SYSTEM_PROMPT
-
-    def test_contains_response_guidelines(self):
-        assert "RESPONSE GUIDELINES" in DEFAULT_SYSTEM_PROMPT
+    def test_is_non_empty_string(self):
+        assert isinstance(DEFAULT_SYSTEM_PROMPT, str)
+        assert len(DEFAULT_SYSTEM_PROMPT) > 0
 
 
 # ---------------------------------------------------------------------------

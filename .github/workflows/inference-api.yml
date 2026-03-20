@@ -1,4 +1,4 @@
-name: "Step 3 — Deploy Inference API (AgentCore Runtime)"
+name: "3. Deploy Inference API (AgentCore Runtime)"
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
       - develop
     paths:
       - 'backend/src/apis/inference_api/**'
+      - 'backend/src/apis/shared/**'
       - 'backend/src/agents/**'
       - 'backend/pyproject.toml'
       - 'backend/Dockerfile.inference-api'
@@ -19,6 +20,7 @@ on:
       - develop
     paths:
       - 'backend/src/apis/inference_api/**'
+      - 'backend/src/apis/shared/**'
       - 'backend/src/agents/**'
       - 'backend/pyproject.toml'
       - 'backend/Dockerfile.inference-api'
@@ -47,7 +49,10 @@ on:
 
 env:
   # Build and Deploy Configuration (non-sensitive, repository-level)
-  CDK_REQUIRE_APPROVAL: never  
+  CDK_REQUIRE_APPROVAL: never
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Suppress repeated config dumps from load-env.sh in CI logs
+  LOAD_ENV_QUIET: true
 
 # Ensure only one deployment runs at a time
 concurrency:
@@ -55,29 +60,58 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  check-stack-dependencies:
+    name: Check Stack Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Run stack dependency tests
+        run: |
+          bash scripts/common/test-stack-dependencies.sh
+
   install:
     name: Install Dependencies
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+
+      - name: Restore Python packages cache
+        id: cache-python
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/.local/lib/python3.*/site-packages
+          key: python-packages-${{ hashFiles('backend/pyproject.toml') }}
+
+      - name: Restore node_modules cache
+        id: cache-infrastructure
+        uses: actions/cache/restore@v5
+        with:
+          path: infrastructure/node_modules
+          key: infrastructure-node-modules-${{ hashFiles('infrastructure/package-lock.json') }}
 
       - name: Install system dependencies
+        if: steps.cache-python.outputs.cache-hit != 'true' || steps.cache-infrastructure.outputs.cache-hit != 'true'
         run: |
           bash scripts/common/install-deps.sh
 
       - name: Install inference-api dependencies
+        if: steps.cache-python.outputs.cache-hit != 'true' || steps.cache-infrastructure.outputs.cache-hit != 'true'
         run: |
           bash scripts/stack-inference-api/install.sh
 
       - name: Save Python packages cache
-        uses: actions/cache/save@v4
+        if: steps.cache-python.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
         with:
           path: ~/.local/lib/python3.*/site-packages
           key: python-packages-${{ hashFiles('backend/pyproject.toml') }}
 
       - name: Save node_modules cache
-        uses: actions/cache/save@v4
+        if: steps.cache-infrastructure.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
         with:
           path: infrastructure/node_modules
           key: infrastructure-node-modules-${{ hashFiles('infrastructure/package-lock.json') }}
@@ -85,7 +119,7 @@ jobs:
   build-docker:
     name: Build Docker Image
     runs-on: ubuntu-24.04-arm
-    needs: install
+    needs: [install, check-stack-dependencies]
     
     # Select environment to get project prefix for image naming
     environment: ${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'production') || (github.ref == 'refs/heads/develop' && 'development') || 'development' }}
@@ -99,8 +133,8 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-      
+        uses: actions/checkout@v5
+
       - name: Set image tag
         id: set-tag
         run: |
@@ -121,10 +155,10 @@ jobs:
       #     platforms: linux/arm64
       
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Build and export Docker image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: backend/Dockerfile.inference-api
@@ -136,8 +170,15 @@ jobs:
             APP_VERSION=${{ steps.read-version.outputs.APP_VERSION }}
           outputs: type=docker,dest=${{ runner.temp }}/inference-api-image.tar
       
+      - name: Capture image size
+        id: image-size
+        run: |
+          IMAGE_SIZE=$(stat --format='%s' "${{ runner.temp }}/inference-api-image.tar" 2>/dev/null || stat -f '%z' "${{ runner.temp }}/inference-api-image.tar" 2>/dev/null || echo "0")
+          echo "IMAGE_SIZE=${IMAGE_SIZE}" >> $GITHUB_OUTPUT
+          echo "Image size: ${IMAGE_SIZE} bytes"
+
       - name: Upload Docker image artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: inference-api-docker-image
           path: ${{ runner.temp }}/inference-api-image.tar
@@ -146,13 +187,13 @@ jobs:
   build-cdk:
     name: Build CDK
     runs-on: ubuntu-latest
-    needs: install
+    needs: [install, check-stack-dependencies]
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Restore node_modules cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: infrastructure/node_modules
           key: infrastructure-node-modules-${{ hashFiles('infrastructure/package-lock.json') }}
@@ -176,10 +217,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Download Docker image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: inference-api-docker-image
           path: ${{ runner.temp }}
@@ -190,6 +231,7 @@ jobs:
           docker image ls -a
       
       - name: Test Docker image
+        id: run-tests
         run: |
           bash scripts/stack-inference-api/test-docker.sh
 
@@ -200,15 +242,16 @@ jobs:
     if: ${{ github.event.inputs.skip_tests != 'true' }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Restore Python packages cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ~/.local/lib/python3.*/site-packages
           key: python-packages-${{ hashFiles('backend/pyproject.toml') }}
 
       - name: Run Python tests
+        id: run-tests
         run: |
           bash scripts/stack-inference-api/test.sh
 
@@ -246,10 +289,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Restore node_modules cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: infrastructure/node_modules
           key: infrastructure-node-modules-${{ hashFiles('infrastructure/package-lock.json') }}
@@ -272,7 +315,7 @@ jobs:
           bash scripts/stack-inference-api/synth.sh
 
       - name: Upload synthesized templates
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: inference-api-cdk-synth
           path: infrastructure/cdk.out/
@@ -304,16 +347,16 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Restore node_modules cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: infrastructure/node_modules
           key: infrastructure-node-modules-${{ hashFiles('infrastructure/package-lock.json') }}
 
       - name: Download synthesized templates
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: inference-api-cdk-synth
           path: infrastructure/cdk.out/
@@ -332,6 +375,7 @@ jobs:
           bash scripts/common/install-deps.sh
 
       - name: Validate CloudFormation template
+        id: run-tests
         run: |
           bash scripts/stack-inference-api/test-cdk.sh
 
@@ -339,7 +383,10 @@ jobs:
     name: Push Docker Image to ECR
     runs-on: ubuntu-latest
     needs: [build-docker, test-docker, test-python]
-    if: always() && !cancelled() && !contains(needs.*.result, 'failure')
+    if: |
+      always() && !cancelled() &&
+      !contains(needs.*.result, 'failure') &&
+      github.event_name != 'pull_request'
     
     # Select environment based on trigger
     # Manual: workflow_dispatch input
@@ -366,10 +413,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       
       - name: Download Docker image artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: inference-api-docker-image
           path: ${{ runner.temp }}
@@ -389,6 +436,7 @@ jobs:
           aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
       
       - name: Push to ECR
+        id: push-ecr
         run: |
           bash scripts/stack-inference-api/push-to-ecr.sh
 
@@ -432,16 +480,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Restore node_modules cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: infrastructure/node_modules
           key: infrastructure-node-modules-${{ hashFiles('infrastructure/package-lock.json') }}
 
       - name: Download synthesized templates
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: inference-api-cdk-synth
           path: infrastructure/cdk.out/
@@ -468,33 +516,31 @@ jobs:
           bash scripts/stack-inference-api/tag-latest.sh
      
       - name: Upload stack outputs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: always()
         with:
           name: inference-api-deployment-outputs
           path: |
             cdk-outputs-inference-api.json
           retention-days: 30
-            
-      - name: Deployment summary
-        if: success()
-        run: | 
-          ENVIRONMENT="${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'production') || (github.ref == 'refs/heads/develop' && 'development') || 'development' }}"
-          
-          echo "## Inference API Deployment Successful ✅" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Deployment Details" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment**: ${ENVIRONMENT}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Region**: ${CDK_AWS_REGION}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Project**: ${CDK_PROJECT_PREFIX}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Stack**: InferenceApiStack (AWS Bedrock AgentCore Runtime)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Image Tag**: ${IMAGE_TAG}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Platform**: linux/arm64" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ -f cdk-outputs-inference-api.json ]; then
-            echo "### Stack Outputs" >> $GITHUB_STEP_SUMMARY
-            echo '```json' >> $GITHUB_STEP_SUMMARY
-            cat cdk-outputs-inference-api.json >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate summary
+        if: always()
+        run: |
+          source scripts/common/summary.sh
+
+          if [ "${{ job.status }}" = "success" ]; then
+            STATUS="success"
+          else
+            STATUS="failure"
+          fi
+
+          write_workflow_header "Inference API" "$STATUS" "InferenceApiStack"
+
+          if [ "$STATUS" = "success" ]; then
+            if [ -f cdk-outputs-inference-api.json ]; then
+              write_cdk_outputs_table "cdk-outputs-inference-api.json"
+            fi
+          else
+            write_failure_summary "CDK Deploy" "1" "Deployment failed — check logs above"
           fi

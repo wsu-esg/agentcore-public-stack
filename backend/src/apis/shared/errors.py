@@ -2,7 +2,7 @@
 
 from enum import Enum
 from typing import Optional, Dict, Any
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class ErrorCode(str, Enum):
@@ -33,14 +33,13 @@ class ErrorCode(str, Enum):
 class ErrorDetail(BaseModel):
     """Structured error detail for API responses"""
 
+    model_config = ConfigDict(use_enum_values=True)
+
     code: ErrorCode
     message: str
     detail: Optional[str] = None
     field: Optional[str] = None  # For validation errors
     metadata: Optional[Dict[str, Any]] = None
-
-    class Config:
-        use_enum_values = True
 
 
 class StreamErrorEvent(BaseModel):
@@ -50,14 +49,13 @@ class StreamErrorEvent(BaseModel):
     use ConversationalErrorEvent which displays errors as assistant messages.
     """
 
+    model_config = ConfigDict(use_enum_values=True)
+
     error: str  # User-friendly error message
     code: ErrorCode
     detail: Optional[str] = None
     recoverable: bool = False  # Whether client should retry
     metadata: Optional[Dict[str, Any]] = None
-
-    class Config:
-        use_enum_values = True
 
     def to_sse_format(self) -> str:
         """Convert to SSE event format"""
@@ -73,15 +71,14 @@ class ConversationalErrorEvent(BaseModel):
     also persisted to session history.
     """
 
+    model_config = ConfigDict(use_enum_values=True)
+
     type: str = "stream_error"
     code: ErrorCode
     message: str  # Markdown-formatted message to display as assistant response
     recoverable: bool = False
     retry_after: Optional[int] = None  # Seconds to wait before retry
     metadata: Optional[Dict[str, Any]] = None
-
-    class Config:
-        use_enum_values = True
 
     def to_sse_format(self) -> str:
         """Convert to SSE event format"""

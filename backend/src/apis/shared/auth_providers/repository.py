@@ -3,7 +3,7 @@
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 import boto3
@@ -135,7 +135,7 @@ class AuthProviderRepository:
             raise ValueError(f"Auth provider '{data.provider_id}' already exists")
 
         try:
-            now = datetime.utcnow().isoformat() + "Z"
+            now = datetime.now(timezone.utc).isoformat() + "Z"
 
             provider = AuthProvider(
                 provider_id=data.provider_id,
@@ -212,7 +212,7 @@ class AuthProviderRepository:
                 if hasattr(existing, field_name):
                     setattr(existing, field_name, value)
 
-            existing.updated_at = datetime.utcnow().isoformat() + "Z"
+            existing.updated_at = datetime.now(timezone.utc).isoformat() + "Z"
 
             # Store updated provider
             self._table.put_item(Item=existing.to_dynamo_item())

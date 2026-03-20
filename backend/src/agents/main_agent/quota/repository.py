@@ -1,7 +1,7 @@
 """DynamoDB repository for quota management (Phase 1)."""
 
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 import boto3
 from botocore.exceptions import ClientError
 import logging
@@ -118,7 +118,7 @@ class QuotaRepository:
                 expr_attr_values[f":{key}"] = value
 
             # Add updatedAt timestamp (always use current time from repository)
-            now = datetime.utcnow().isoformat() + 'Z'
+            now = datetime.now(timezone.utc).isoformat() + 'Z'
             update_parts.append("#updatedAt = :updatedAt")
             expr_attr_names["#updatedAt"] = "updatedAt"
             expr_attr_values[":updatedAt"] = now
@@ -366,7 +366,7 @@ class QuotaRepository:
                 expr_attr_values[f":{key}"] = value
 
             # Add updatedAt timestamp
-            now = datetime.utcnow().isoformat() + 'Z'
+            now = datetime.now(timezone.utc).isoformat() + 'Z'
             update_parts.append("#updatedAt = :updatedAt")
             expr_attr_names["#updatedAt"] = "updatedAt"
             expr_attr_values[":updatedAt"] = now
@@ -524,7 +524,7 @@ class QuotaRepository:
         """Get most recent event of a specific type within time window (for deduplication)"""
         try:
             from datetime import timedelta
-            cutoff_time = (datetime.utcnow() - timedelta(minutes=within_minutes)).isoformat() + 'Z'
+            cutoff_time = (datetime.now(timezone.utc) - timedelta(minutes=within_minutes)).isoformat() + 'Z'
 
             response = self.events_table.query(
                 KeyConditionExpression="PK = :pk AND SK >= :cutoff",
@@ -592,7 +592,7 @@ class QuotaRepository:
 
     async def get_active_override(self, user_id: str) -> Optional[QuotaOverride]:
         """Get active override for user (valid and enabled)"""
-        now = datetime.utcnow().isoformat() + 'Z'
+        now = datetime.now(timezone.utc).isoformat() + 'Z'
 
         try:
             response = self.table.query(
@@ -653,7 +653,7 @@ class QuotaRepository:
                 )
 
             overrides = []
-            now = datetime.utcnow().isoformat() + 'Z'
+            now = datetime.now(timezone.utc).isoformat() + 'Z'
 
             for item in response.get('Items', []):
                 for key in ['PK', 'SK', 'GSI4PK', 'GSI4SK']:

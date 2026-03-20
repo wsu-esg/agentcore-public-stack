@@ -1,6 +1,6 @@
 ---
 inclusion: fileMatch
-fileMatchPattern: ['**/*.html', '**/*.css', '**/*.ts', 'src/app/**/*']
+fileMatchPattern: ["frontend/*"]
 ---
 
 # Frontend Design Principles

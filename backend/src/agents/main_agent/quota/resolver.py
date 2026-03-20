@@ -1,7 +1,7 @@
 """Quota resolver with intelligent caching."""
 
 from typing import Optional, Dict, Tuple, List
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import logging
 from apis.shared.auth.models import User
 from .models import QuotaTier, QuotaAssignment, ResolvedQuota
@@ -61,7 +61,7 @@ class QuotaResolver:
         # Check cache
         if cache_key in self._cache:
             resolved, cached_at = self._cache[cache_key]
-            if datetime.utcnow() - cached_at < timedelta(seconds=self.cache_ttl):
+            if datetime.now(timezone.utc) - cached_at < timedelta(seconds=self.cache_ttl):
                 logger.debug(f"Cache hit for user {user.user_id}")
                 return resolved
 
@@ -70,7 +70,7 @@ class QuotaResolver:
         resolved = await self._resolve_from_db(user)
 
         # Cache result
-        self._cache[cache_key] = (resolved, datetime.utcnow())
+        self._cache[cache_key] = (resolved, datetime.now(timezone.utc))
 
         return resolved
 
@@ -249,7 +249,7 @@ class QuotaResolver:
         """Get domain assignments with separate cache"""
         if self._domain_assignments_cache:
             assignments, cached_at = self._domain_assignments_cache
-            if datetime.utcnow() - cached_at < timedelta(seconds=self.cache_ttl):
+            if datetime.now(timezone.utc) - cached_at < timedelta(seconds=self.cache_ttl):
                 return assignments
 
         # Cache miss - query domain assignments
@@ -257,7 +257,7 @@ class QuotaResolver:
             assignment_type="email_domain",
             enabled_only=True
         )
-        self._domain_assignments_cache = (assignments, datetime.utcnow())
+        self._domain_assignments_cache = (assignments, datetime.now(timezone.utc))
         return assignments
 
     def _matches_email_domain(self, user_domain: str, pattern: str) -> bool:

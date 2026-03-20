@@ -90,4 +90,13 @@ echo -e "${GREEN}[UPDATED]${NC} frontend/ai.client/package.json"
 sed -i "0,/\"version\": \"[^\"]*\"/s/\"version\": \"[^\"]*\"/\"version\": \"${VERSION}\"/" "${INFRA_PKG}"
 echo -e "${GREEN}[UPDATED]${NC} infrastructure/package.json"
 
-echo -e "\n${GREEN}[DONE]${NC} All manifests updated to ${VERSION}"
+# Regenerate package-lock.json files so they reflect the new version
+echo -e "\nRegenerating package-lock.json files..."
+
+npm install --package-lock-only --prefix "${REPO_ROOT}/frontend/ai.client" 2>/dev/null
+echo -e "${GREEN}[UPDATED]${NC} frontend/ai.client/package-lock.json"
+
+npm install --package-lock-only --prefix "${REPO_ROOT}/infrastructure" 2>/dev/null
+echo -e "${GREEN}[UPDATED]${NC} infrastructure/package-lock.json"
+
+echo -e "\n${GREEN}[DONE]${NC} All manifests and lockfiles updated to ${VERSION}"

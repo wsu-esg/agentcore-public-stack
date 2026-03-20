@@ -1,7 +1,7 @@
 """User sync service for JWT-to-DynamoDB synchronization."""
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Tuple, Optional
 
 from .models import UserProfile, UserStatus
@@ -62,7 +62,7 @@ class UserSyncService:
         if "@" in email:
             email_domain = email.split("@")[1]
 
-        now = datetime.utcnow().isoformat() + "Z"
+        now = datetime.now(timezone.utc).isoformat() + "Z"
 
         # Build profile from JWT claims
         profile = UserProfile(

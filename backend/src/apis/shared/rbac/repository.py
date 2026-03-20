@@ -3,7 +3,7 @@
 import os
 import logging
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 import boto3
 from botocore.exceptions import ClientError
@@ -115,7 +115,7 @@ class AppRoleRepository:
                 raise ValueError(f"Role '{role.role_id}' already exists")
 
             # Set timestamps
-            now = datetime.utcnow().isoformat() + "Z"
+            now = datetime.now(timezone.utc).isoformat() + "Z"
             role.created_at = now
             role.updated_at = now
 
@@ -152,7 +152,7 @@ class AppRoleRepository:
                 raise ValueError(f"Role '{role.role_id}' not found")
 
             # Update timestamp
-            role.updated_at = datetime.utcnow().isoformat() + "Z"
+            role.updated_at = datetime.now(timezone.utc).isoformat() + "Z"
             role.created_at = existing.created_at  # Preserve original
 
             # Delete old mapping items and create new ones

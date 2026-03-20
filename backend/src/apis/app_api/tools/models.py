@@ -5,7 +5,7 @@ Pydantic models for tool catalog, user tool access, and preferences.
 Integrates with the existing AppRole RBAC system.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Dict, List, Optional
 
@@ -295,8 +295,8 @@ class ToolDefinition(BaseModel):
     )
 
     # Audit
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     created_by: Optional[str] = Field(
         None, description="User ID of admin who created this entry"
     )
@@ -382,8 +382,8 @@ class ToolDefinition(BaseModel):
             enabled_by_default=item.get("enabledByDefault", False),
             mcp_config=mcp_config,
             a2a_config=a2a_config,
-            created_at=datetime.fromisoformat(created_at.rstrip("Z")) if created_at else datetime.utcnow(),
-            updated_at=datetime.fromisoformat(updated_at.rstrip("Z")) if updated_at else datetime.utcnow(),
+            created_at=datetime.fromisoformat(created_at.rstrip("Z")) if created_at else datetime.now(timezone.utc),
+            updated_at=datetime.fromisoformat(updated_at.rstrip("Z")) if updated_at else datetime.now(timezone.utc),
             created_by=item.get("createdBy"),
             updated_by=item.get("updatedBy"),
         )
@@ -400,7 +400,7 @@ class UserToolPreference(BaseModel):
     tool_preferences: Dict[str, bool] = Field(
         default_factory=dict, description="Map of tool_id -> enabled state"
     )
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_dynamo_item(self) -> dict:
         """Convert to DynamoDB item format."""
@@ -419,7 +419,7 @@ class UserToolPreference(BaseModel):
         return cls(
             user_id=item.get("userId", ""),
             tool_preferences=item.get("toolPreferences", {}),
-            updated_at=datetime.fromisoformat(updated_at.rstrip("Z")) if updated_at else datetime.utcnow(),
+            updated_at=datetime.fromisoformat(updated_at.rstrip("Z")) if updated_at else datetime.now(timezone.utc),
         )
 
 

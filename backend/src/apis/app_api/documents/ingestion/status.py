@@ -7,7 +7,7 @@ import logging
 import os
 import traceback
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Tuple, Literal
 
 # Type alias for document processing status (duplicated from models.py for standalone use)
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 def _get_current_timestamp() -> str:
     """Get current timestamp in ISO 8601 format"""
-    return datetime.utcnow().isoformat() + "Z"
+    return datetime.now(timezone.utc).isoformat() + "Z"
 
 async def update_document_status(
     assistant_id: str,

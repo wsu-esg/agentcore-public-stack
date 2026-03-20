@@ -144,10 +144,10 @@ class QuotaExceededEvent(BaseModel):
 
 def build_quota_exceeded_response(result: QuotaCheckResult) -> QuotaExceededResponse:
     """Build a 429 response from a QuotaCheckResult"""
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     # Calculate reset info
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     period_type = result.tier.period_type if result.tier else "monthly"
 
     if period_type == "daily":
@@ -155,9 +155,9 @@ def build_quota_exceeded_response(result: QuotaCheckResult) -> QuotaExceededResp
     else:
         # Monthly - calculate days until end of month
         if now.month == 12:
-            next_month = datetime(now.year + 1, 1, 1)
+            next_month = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
         else:
-            next_month = datetime(now.year, now.month + 1, 1)
+            next_month = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
         days_remaining = (next_month - now).days
         reset_info = f"Quota resets in {days_remaining} day(s)"
 
@@ -193,10 +193,10 @@ def build_quota_exceeded_event(result: QuotaCheckResult) -> QuotaExceededEvent:
     This creates an event that will be streamed to the client and displayed
     as an assistant message in the chat, providing a better UX than a 429 error.
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     # Calculate reset info
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     period_type = result.tier.period_type if result.tier else "monthly"
 
     if period_type == "daily":
@@ -204,9 +204,9 @@ def build_quota_exceeded_event(result: QuotaCheckResult) -> QuotaExceededEvent:
     else:
         # Monthly - calculate days until end of month
         if now.month == 12:
-            next_month = datetime(now.year + 1, 1, 1)
+            next_month = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
         else:
-            next_month = datetime(now.year, now.month + 1, 1)
+            next_month = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
         days_remaining = (next_month - now).days
         reset_info = f"Your quota resets in {days_remaining} day(s)."
 

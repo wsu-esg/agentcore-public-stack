@@ -96,7 +96,8 @@ def seed_auth_provider(
             result.details.append(msg)
             return result
     except ClientError as e:
-        msg = f"Failed to check existing auth provider '{provider_id}': {e}"
+        error_code = e.response["Error"]["Code"]
+        msg = f"Failed to check existing auth provider '{provider_id}': {error_code}"
         logger.error(msg)
         result.failed = 1
         result.details.append(msg)
@@ -164,7 +165,8 @@ def seed_auth_provider(
         table.put_item(Item=item)
         logger.info("Auth provider '%s' written to DynamoDB", provider_id)
     except ClientError as e:
-        msg = f"Failed to write auth provider '{provider_id}' to DynamoDB: {e}"
+        error_code = e.response["Error"]["Code"]
+        msg = f"Failed to write auth provider '{provider_id}' to DynamoDB: {error_code}"
         logger.error(msg)
         result.failed = 1
         result.details.append(msg)
@@ -193,7 +195,8 @@ def seed_auth_provider(
         else:
             logger.info("Client secret for '%s' already in Secrets Manager — kept existing", provider_id)
     except ClientError as e:
-        msg = f"Failed to write secret for '{provider_id}': {e}"
+        error_code = e.response["Error"]["Code"]
+        msg = f"Failed to write secret for '{provider_id}': {error_code}"
         logger.error(msg)
         result.failed = 1
         result.details.append(msg)
@@ -869,12 +872,14 @@ def main() -> None:
     results: list[SeedResult] = []
 
     # --- Auth provider seeding ---
-    required_auth_vars = {
-        "SEED_AUTH_ISSUER_URL": auth_issuer_url,
-        "SEED_AUTH_CLIENT_ID": auth_client_id,
-        "SEED_AUTH_CLIENT_SECRET": auth_client_secret,
-    }
-    missing_auth = [k for k, v in required_auth_vars.items() if not v]
+    required_auth_var_names = [
+        "SEED_AUTH_ISSUER_URL",
+        "SEED_AUTH_CLIENT_ID",
+        "SEED_AUTH_CLIENT_SECRET",
+    ]
+    missing_auth = [
+        name for name in required_auth_var_names if not os.environ.get(name, "")
+    ]
 
     if missing_auth:
         logger.warning(

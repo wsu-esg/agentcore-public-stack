@@ -51,6 +51,9 @@ on:
         required: false
         default: 'false'
 
+permissions:
+  contents: read
+
 env:
   # Build and Deploy Configuration (non-sensitive, repository-level)
   CDK_REQUIRE_APPROVAL: never
@@ -128,6 +131,7 @@ jobs:
     name: Build Docker Image
     runs-on: ubuntu-24.04
     needs: [install, check-stack-dependencies]
+    if: github.event_name != 'pull_request'
     
     # Select environment to get project prefix for image naming
     environment: ${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'production') || (github.ref == 'refs/heads/develop' && 'development') || 'development' }}

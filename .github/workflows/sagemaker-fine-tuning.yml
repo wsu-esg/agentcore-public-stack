@@ -47,6 +47,9 @@ on:
         required: false
         default: 'false'
 
+permissions:
+  contents: read
+
 env:
   # Build and Deploy Configuration (non-sensitive, repository-level)
   CDK_REQUIRE_APPROVAL: never
@@ -63,6 +66,7 @@ jobs:
   check-stack-dependencies:
     name: Check Stack Dependencies
     runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request'
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -74,6 +78,7 @@ jobs:
   install:
     name: Install Dependencies
     runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request'
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -124,6 +129,7 @@ jobs:
     name: Synthesize CloudFormation Template
     runs-on: ubuntu-24.04
     needs: build
+    if: github.event_name != 'pull_request'
     outputs:
       enabled: ${{ steps.check.outputs.enabled }}
 

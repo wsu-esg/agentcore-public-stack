@@ -45,10 +45,13 @@ on:
         required: false
         default: 'false'
 
+permissions:
+  contents: read
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   # Build and Deploy Configuration (non-sensitive, repository-level)
-  BUILD_CONFIG: production
+  BUILD_CONFIG: ${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'production') || 'development' }}
   CDK_REQUIRE_APPROVAL: never
   WAIT_FOR_INVALIDATION: false
   # Suppress repeated config dumps from load-env.sh in CI logs
@@ -120,6 +123,7 @@ jobs:
     name: Build Frontend
     runs-on: ubuntu-24.04
     needs: [install, check-stack-dependencies]
+    if: github.event_name != 'pull_request'
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -152,6 +156,7 @@ jobs:
     name: Build CDK
     runs-on: ubuntu-24.04
     needs: [install, check-stack-dependencies]
+    if: github.event_name != 'pull_request'
     outputs:
       app-version: ${{ steps.read-version.outputs.APP_VERSION }}
     steps:

@@ -1,3 +1,140 @@
+# Release Notes — v1.0.0-beta.19
+
+**Release Date:** March 25, 2026
+**Previous Release:** v1.0.0-beta.18 (March 24, 2026)
+
+---
+
+## Highlights
+
+This release introduces **Conversation Sharing** — a full-stack feature that lets users share point-in-time snapshots of conversations via URL, with public or email-restricted access controls. Alongside that, **session compaction** has been refactored and enabled by default to automatically manage context window size in long conversations, **fine-tuning** gains drag-and-drop dataset uploads and custom HuggingFace model support, and a round of **security hardening** resolves all remaining CodeQL clear-text logging alerts. The frontend production build is now fully optimized (4.96 MB initial, down from 8.85 MB), and PR workflows have been slimmed down to only run build and test steps.
+
+---
+
+## New Feature: Conversation Sharing
+
+Users can now share conversations with others via shareable URLs. Shares are point-in-time snapshots — the shared view captures the conversation as it existed at the moment of sharing, so subsequent messages don't leak into shared links.
+
+### How It Works
+
+- **Share modal** accessible from the session UI lets users create a share with either `public` (anyone with the link) or `specific` (restricted to a list of email addresses) access
+- **Manage shares dialog** on the session management page shows all active shares with options to update access levels or revoke
+- **Read-only shared view** at `/shared/:shareId` renders the conversation with full markdown formatting, no authentication required for public shares
+- **Export support** for downloading shared conversations
+
+### Backend
+
+Three new API routers handle the sharing lifecycle:
+
+- `POST /conversations/{session_id}/share` — Create a share snapshot
+- `GET /conversations/{session_id}/shares` — List shares for a session
+- `PUT /shares/{share_id}` — Update access level or allowed emails
+- `DELETE /shares/{share_id}` — Revoke a share
+- `GET /shares/{share_id}/export` — Export shared conversation
+- `GET /shared/{share_id}` — Public read-only retrieval
+
+### Infrastructure
+
+A new `shared-conversations` DynamoDB table is provisioned in the Infrastructure stack with two GSIs:
+
+- `SessionShareIndex` — Lookup shares by original session ID
+- `OwnerShareIndex` — List shares by owner, sorted by creation time
+
+The table name and ARN are exported via SSM parameters and imported by the App API stack, which grants full CRUD permissions to the Fargate task role.
+
+### Test Coverage
+
+1,300+ lines of new tests across three test files covering share CRUD operations, access control enforcement, export functionality, and property validation.
+
+---
+
+## Session Compaction — Enabled by Default
+
+The session compaction system has been refactored and is now **enabled by default** for all conversations. Compaction automatically manages context window size by summarizing older turns when the token count exceeds the threshold, keeping conversations responsive without manual intervention.
+
+- **Default configuration:** enabled, 100K token threshold, 3 protected recent turns, 500-char max tool content length
+- **Turn-based session manager** rewritten with cleaner separation of concerns (870-line net reduction)
+- **Expanded test suite** with 481+ new lines of test coverage for compaction behavior
+
+---
+
+## Fine-Tuning Enhancements
+
+### Drag-and-Drop Dataset Upload
+
+The training job creation page now supports drag-and-drop file upload with visual feedback, replacing the basic file picker. Upload instructions have been updated to guide users through dataset formatting requirements.
+
+### Custom HuggingFace Model Support
+
+Users are no longer limited to the preset model list. The training job form now includes a searchable model selector that accepts any valid HuggingFace model identifier. The backend validates and passes custom model IDs through to SageMaker. Frontend tests cover the custom model selection and submission flow.
+
+---
+
+## Security Hardening
+
+### Clear-Text Logging Remediation
+
+All remaining CodeQL clear-text logging alerts have been resolved:
+
+- **`seed_auth_provider`** — Client IDs masked to first 8 characters, Secrets Manager ARNs fully redacted from output
+- **`seed_bootstrap_data`** — Full exception objects replaced with error codes in log messages
+- **`external_mcp_client`** — Server URLs removed from logs, MCP client configuration logging downgraded from info to debug
+- **`oauth_tool_service`** — Decrypted tokens isolated into `_try_get_token()` to prevent taint propagation, lazy log formatting applied
+- **`config.ts`** — AWS account IDs and CORS origins removed from CDK config log output
+
+### OAuth Redirect Validation
+
+The OAuth callback endpoint now validates redirect URLs to prevent open redirect vulnerabilities.
+
+### Workflow Permissions
+
+All 13 GitHub Actions workflows now declare explicit `permissions: contents: read`, implementing the principle of least privilege instead of relying on default token permissions.
+
+---
+
+## Frontend Production Optimization
+
+The Angular production build is now fully optimized:
+
+- Removed `optimization: false` override from base build options that was blocking the production configuration
+- Production config now enables full optimization, disables source maps, and extracts licenses
+- `anyComponentStyle` budget increased from 4 kB to 200 kB to accommodate Tailwind CSS
+- **Result:** 4.96 MB initial bundle (871 KB gzipped), down from 8.85 MB unoptimized
+- `BUILD_CONFIG` is now branch-aware: `main` → production, `develop` → development, manual dispatch → user input
+
+### Google Fonts Fix
+
+Google Fonts `@import` statements moved from component CSS to `index.html` `<link>` tags, fixing a CI build failure where the CSS optimizer couldn't resolve external font URLs.
+
+---
+
+## CI/CD Improvements
+
+### Lighter PR Workflows
+
+Pull request workflow runs have been significantly trimmed across all 7 deployment workflows. PRs now only run:
+
+- Dependency installation and caching
+- Stack dependency validation
+- CDK TypeScript compilation (catches build errors)
+- Python tests (app-api, inference-api)
+- Frontend tests (Vitest)
+
+Skipped on PRs: Docker image builds, Docker image tests, CDK synthesis, CDK validation, ECR push, and deployment. This reduces PR CI time and eliminates the need for AWS credentials on pull requests.
+
+---
+
+## Bug Fixes
+
+- **Bedrock prompt caching** — Caching configuration commented out in model config due to current Bedrock limitations. Tests updated to reflect the change.
+
+---
+
+## Deployment Notes
+
+This release adds a new DynamoDB table (`shared-conversations`) to the Infrastructure stack. Deploy the Infrastructure stack first, then the App API stack. If deploying all stacks simultaneously, the App API deployment may fail on first run due to the SSM parameter dependency — just rerun it after Infrastructure completes.
+
+---
 # Release Notes — v1.0.0-beta.18
 
 **Release Date:** March 24, 2026

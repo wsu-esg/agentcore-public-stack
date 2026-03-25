@@ -1,6 +1,6 @@
 {
   "name": "infrastructure",
-  "version": "1.0.0-beta.18",
+  "version": "1.0.0-beta.19",
   "bin": {
     "infrastructure": "bin/infrastructure.js"
   },

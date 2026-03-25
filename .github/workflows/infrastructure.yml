@@ -47,6 +47,9 @@ on:
         required: false
         default: 'false'
 
+permissions:
+  contents: read
+
 env:
   # Build and Deploy Configuration (non-sensitive, repository-level)
   CDK_REQUIRE_APPROVAL: never
@@ -136,6 +139,7 @@ jobs:
     name: Synthesize CloudFormation Template
     runs-on: ubuntu-24.04
     needs: build
+    if: github.event_name != 'pull_request'
     
     # Select environment based on trigger
     # Manual: workflow_dispatch input

@@ -8,7 +8,7 @@
 **An open-source, production-ready Generative AI platform for institutions**
 *Built by Boise State University, designed for everyone.*
 
-[![Release](https://img.shields.io/badge/Release-v1.0.0--beta.18-6366f1?style=flat&logo=github&logoColor=white)](RELEASE_NOTES.md)
+[![Release](https://img.shields.io/badge/Release-v1.0.0--beta.19-6366f1?style=flat&logo=github&logoColor=white)](RELEASE_NOTES.md)
 [![Nightly](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/nightly.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/nightly.yml)
 
 ![Python](https://img.shields.io/badge/Python-3.13+-3776AB?style=flat&logo=python&logoColor=white)
@@ -89,6 +89,22 @@ Users can upload images (PNG, JPEG, GIF, WebP) and documents (PDF, CSV, DOCX) di
 ### 🧪 Fine-Tuning
 
 Train and run inference on open-source models directly from the platform. Users with admin-granted access can upload datasets, launch **SageMaker training jobs** on models like BERT, RoBERTa, GPT-2, and more, then run **batch inference** on trained models — all with real-time progress tracking, quota enforcement, and automatic 30-day artifact retention. No ML infrastructure setup required.
+
+### 🔑 API Keys
+
+Enable programmatic access to the platform's AI models via REST API. Users generate personal API keys from the Settings page and use them to call the `/chat/api-converse` endpoint — the same models, quotas, and RBAC permissions as the web UI, accessible from any language or tool.
+
+**How it works:**
+
+- **One key per user** — creating a new key automatically revokes the previous one
+- **90-day expiration** — keys expire automatically; create a new one to renew
+- **Secure by design** — keys are SHA-256 hashed at rest; the raw key is shown only once at creation
+- **Rate limited** — 60 requests per minute per key
+- **Streaming support** — both SSE streaming and standard JSON responses
+
+**Authentication:** Include the key in the `X-API-Key` header with each request. The platform resolves the user, checks quotas, enforces RBAC model access, and tracks costs — identical to browser-based usage.
+
+**Built-in code examples:** The API Keys settings page includes a code generator with cURL, Python, and JavaScript examples, a model selector, and configurable parameters (temperature, max tokens, system prompt) so users can start integrating immediately.
 
 ### 🧠 Memory and Context
 
@@ -241,7 +257,7 @@ agentcore-public-stack/
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the full changelog, including new features, bug fixes, platform upgrades, and deployment notes for each release.
 
-**Current release:** v1.0.0-beta.18
+**Current release:** v1.0.0-beta.19
 
 ---
 

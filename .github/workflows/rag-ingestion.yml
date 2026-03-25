@@ -40,6 +40,9 @@ on:
         required: false
         default: 'false'
 
+permissions:
+  contents: read
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   # Build and Deploy Configuration (non-sensitive, repository-level)
@@ -56,6 +59,7 @@ jobs:
   check-stack-dependencies:
     name: Check Stack Dependencies
     runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request'
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -67,6 +71,7 @@ jobs:
   install:
     name: Install Dependencies
     runs-on: ubuntu-24.04
+    if: github.event_name != 'pull_request'
     steps:
       - name: Checkout code
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -99,6 +104,7 @@ jobs:
     name: Build Docker Image
     runs-on: ubuntu-24.04-arm  # Use ARM64-native runner for ARM64 Lambda builds
     needs: [install, check-stack-dependencies]
+    if: github.event_name != 'pull_request'
     
     # Select environment to get project prefix for image naming
     environment: ${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'production') || (github.ref == 'refs/heads/develop' && 'development') || 'development' }}

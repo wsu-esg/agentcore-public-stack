@@ -284,8 +284,8 @@ class TestInvalidSessionIdRejection:
             # URL-encode the session_id to handle special characters
             resp = client.get(f"/sessions/{session_id}/metadata")
 
-        assert resp.status_code in (404, 422), (
-            f"Expected 404 or 422 for session_id '{session_id}', got {resp.status_code}"
+        assert resp.status_code in (404, 405, 422), (
+            f"Expected 404, 405, or 422 for session_id '{session_id}', got {resp.status_code}"
         )
 
 

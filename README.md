@@ -8,7 +8,7 @@
 **An open-source, production-ready Generative AI platform for institutions**
 *Built by Boise State University, designed for everyone.*
 
-[![Release](https://img.shields.io/badge/Release-v1.0.0--beta.20-6366f1?style=flat&logo=github&logoColor=white)](RELEASE_NOTES.md)
+[![Release](https://img.shields.io/badge/Release-v1.0.0--beta.22-6366f1?style=flat&logo=github&logoColor=white)](RELEASE_NOTES.md)
 [![Nightly](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/nightly.yml/badge.svg)](https://github.com/Boise-State-Development/agentcore-public-stack/actions/workflows/nightly.yml)
 
 ![Python](https://img.shields.io/badge/Python-3.13+-3776AB?style=flat&logo=python&logoColor=white)
@@ -220,7 +220,7 @@ The fastest path to production is the **GitHub Actions pipeline**, which automat
 ./start.sh
 ``` -->
 
-See [backend/README.md](backend/README.md) for detailed backend setup, including authentication provider bootstrapping.
+See [backend/README.md](backend/README.md) for detailed backend setup. Authentication is handled by Cognito's first-boot flow — the first user to access the application creates the admin account directly.
 
 ---
 
@@ -229,7 +229,6 @@ See [backend/README.md](backend/README.md) for detailed backend setup, including
 ```
 agentcore-public-stack/
 ├── backend/
-│   ├── lambda-functions/            # Runtime provisioner & updater
 │   └── src/
 │       ├── agents/main_agent/       # Agent core: factory, tools, memory, streaming
 │       └── apis/
@@ -257,7 +256,7 @@ agentcore-public-stack/
 
 See [RELEASE_NOTES.md](RELEASE_NOTES.md) for the full changelog, including new features, bug fixes, platform upgrades, and deployment notes for each release.
 
-**Current release:** v1.0.0-beta.20
+**Current release:** v1.0.0-beta.22
 
 ---
 

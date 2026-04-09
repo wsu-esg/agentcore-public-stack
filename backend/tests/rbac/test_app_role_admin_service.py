@@ -122,21 +122,27 @@ async def test_create_role_duplicate_raises(service, mock_app_role_repo, admin):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_update_system_admin_protected_fields_raises(
+async def test_update_system_admin_protected_fields_stripped(
     service, mock_app_role_repo, make_app_role, admin
 ):
-    """Updating protected fields on system_admin raises ValueError."""
+    """Updating protected fields on system_admin silently strips them."""
     system_admin_role = make_app_role(
         role_id="system_admin",
         display_name="System Admin",
         is_system_role=True,
     )
     mock_app_role_repo.get_role.return_value = system_admin_role
+    mock_app_role_repo.update_role.return_value = system_admin_role
 
-    updates = AppRoleUpdate(priority=999)
+    # priority is a protected field — should be silently stripped
+    updates = AppRoleUpdate(priority=999, display_name="Updated Admin")
 
-    with pytest.raises(ValueError, match="protected fields"):
-        await service.update_role("system_admin", updates, admin)
+    result = await service.update_role("system_admin", updates, admin)
+    assert result is not None
+    # display_name (allowed) should have been applied
+    assert result.display_name == "Updated Admin"
+    # priority (protected) should NOT have changed
+    assert result.priority != 999
 
 
 # ---------------------------------------------------------------------------

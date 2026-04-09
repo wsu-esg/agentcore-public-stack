@@ -10,7 +10,7 @@ import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
-import { AppConfig, getResourceName, applyStandardTags, getRemovalPolicy, getAutoDeleteObjects } from './config';
+import { AppConfig, getResourceName, applyStandardTags, getRemovalPolicy, getAutoDeleteObjects, buildCorsOrigins } from './config';
 
 export interface FrontendStackProps extends cdk.StackProps {
   config: AppConfig;
@@ -72,9 +72,33 @@ export class FrontendStack extends cdk.Stack {
       );
     }
 
+    // ============================================================================
+    // SSM Parameter Imports - Cognito Configuration
+    // ============================================================================
+    // These parameters are exported by InfrastructureStack (Cognito User Pool)
+    // and InferenceApiStack (Runtime endpoint URL).
+    // ============================================================================
+
+    const cognitoDomainUrl = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/${config.projectPrefix}/auth/cognito/domain-url`
+    );
+
+    const cognitoAppClientId = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/${config.projectPrefix}/auth/cognito/app-client-id`
+    );
+
+    const inferenceApiUrl = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/${config.projectPrefix}/inference-api/runtime-endpoint-url`
+    );
+
     // Log imported values for debugging (values will be tokens at synth time)
     console.log('📥 Imported backend URLs from SSM:');
     console.log(`   App API URL: ${appApiUrl}`);
+    console.log(`   Cognito Domain URL: ${cognitoDomainUrl}`);
+    console.log(`   Inference API URL: ${inferenceApiUrl}`);
 
     // ============================================================================
     // Runtime Configuration Generation
@@ -91,6 +115,10 @@ export class FrontendStack extends cdk.Stack {
       appApiUrl: appApiUrl,
       environment: config.production ? 'production' : 'development',
       version: config.appVersion,
+      cognitoDomainUrl: cognitoDomainUrl,
+      cognitoAppClientId: cognitoAppClientId,
+      cognitoRegion: config.awsRegion,
+      inferenceApiUrl: inferenceApiUrl,
     };
 
     console.log('🔧 Generated runtime configuration:');
@@ -304,18 +332,18 @@ export class FrontendStack extends cdk.Stack {
       tier: ssm.ParameterTier.STANDARD,
     });
 
-    // Construct CORS origins list
-    const corsOrigins = config.domainName
-      ? `https://${config.domainName}`
-      : `https://${this.distributionDomainName}`;
+    // Construct CORS origins list via shared helper
+    const corsOrigins = buildCorsOrigins(config, config.frontend.additionalCorsOrigins).join(',');
 
-    // Export CORS origins for runtime provisioner
-    new ssm.StringParameter(this, 'CorsOriginsParameter', {
-      parameterName: `/${config.projectPrefix}/frontend/cors-origins`,
-      stringValue: corsOrigins,
-      description: 'Comma-separated list of allowed CORS origins for OAuth flows',
-      tier: ssm.ParameterTier.STANDARD,
-    });
+    // Export CORS origins for runtime provisioner (SSM rejects empty string values)
+    if (corsOrigins) {
+      new ssm.StringParameter(this, 'CorsOriginsParameter', {
+        parameterName: `/${config.projectPrefix}/frontend/cors-origins`,
+        stringValue: corsOrigins,
+        description: 'Comma-separated list of allowed CORS origins for OAuth flows',
+        tier: ssm.ParameterTier.STANDARD,
+      });
+    }
 
     new ssm.StringParameter(this, 'BucketNameParameter', {
       parameterName: `/${config.projectPrefix}/frontend/bucket-name`,
@@ -378,7 +406,7 @@ def handler(event, context):
                     'AllowedOrigins': [frontend_url, 'http://localhost:4200'],
                     'AllowedMethods': ['GET', 'PUT', 'HEAD'],
                     'AllowedHeaders': ['Content-Type', 'Content-Length', 'x-amz-*'],
-                    'ExposedHeaders': ['ETag', 'Content-Length', 'Content-Type'],
+                    'ExposeHeaders': ['ETag', 'Content-Length', 'Content-Type'],
                     'MaxAgeSeconds': 3600
                 })
             

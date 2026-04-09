@@ -44,7 +44,7 @@ async def list_available_providers(
     Returns:
         OAuthProviderListResponse with available providers
     """
-    logger.info(f"User {current_user.email} listing available OAuth providers")
+    logger.info(f"User {current_user.name} listing available OAuth providers")
 
     # Resolve user's application roles
     permissions = await role_service.resolve_user_permissions(current_user)
@@ -86,7 +86,7 @@ async def list_user_connections(
     Returns:
         OAuthConnectionListResponse with connection statuses
     """
-    logger.info(f"User {current_user.email} listing OAuth connections")
+    logger.info(f"User {current_user.name} listing OAuth connections")
 
     # Resolve user's application roles
     permissions = await role_service.resolve_user_permissions(current_user)

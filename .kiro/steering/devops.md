@@ -215,19 +215,21 @@ cdk deploy StackName \
 
 **File**: `.github/workflows/<stack>.yml`
 
-Add to the `env:` section at workflow level:
-
-- **Secrets** (sensitive data): Use `secrets.`
-- **Variables** (non-sensitive config): Use `vars.`
+Add to the `env:` section **at the job level** (NOT the workflow top-level). Environment-scoped variables (`vars.*`) and secrets (`secrets.*`) require the `environment:` key, which is set on individual jobs. Placing them at the workflow top-level will silently resolve to empty strings.
 
 ```yaml
-env:
-  # CDK Configuration - from GitHub Variables
-  CDK_ALB_SUBDOMAIN: ${{ vars.CDK_ALB_SUBDOMAIN }}
-  
-  # CDK Secrets - from GitHub Secrets
-  CDK_CERTIFICATE_ARN: ${{ secrets.CDK_CERTIFICATE_ARN }}
+jobs:
+  deploy:
+    environment: production
+    env:
+      # CDK Configuration - from GitHub Variables (MUST be at job level)
+      CDK_ALB_SUBDOMAIN: ${{ vars.CDK_ALB_SUBDOMAIN }}
+      
+      # CDK Secrets - from GitHub Secrets
+      CDK_CERTIFICATE_ARN: ${{ secrets.CDK_CERTIFICATE_ARN }}
 ```
+
+**CRITICAL**: Only non-sensitive, non-environment-scoped values (like `CDK_REQUIRE_APPROVAL: never`) belong in the workflow-level `env:`. Everything that reads from `vars.*` or `secrets.*` MUST be in a job-level `env:` block on a job that has `environment:` set.
 
 **When to use Secrets vs Variables:**
 - **Secrets**: API keys, passwords, certificate ARNs, AWS credentials

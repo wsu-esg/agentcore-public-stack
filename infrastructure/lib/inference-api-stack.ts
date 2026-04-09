@@ -7,7 +7,7 @@ import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as xray from 'aws-cdk-lib/aws-xray';
 import * as bedrock from 'aws-cdk-lib/aws-bedrockagentcore';
 import { Construct } from 'constructs';
-import { AppConfig, getResourceName, getTruncatedResourceName, applyStandardTags } from './config';
+import { AppConfig, getResourceName, getTruncatedResourceName, applyStandardTags, buildCorsOrigins } from './config';
 
 export interface InferenceApiStackProps extends cdk.StackProps {
   config: AppConfig;
@@ -17,18 +17,19 @@ export interface InferenceApiStackProps extends cdk.StackProps {
  * Inference API Stack - AWS Bedrock AgentCore Shared Resources
  * 
  * This stack creates shared resources used by all AgentCore Runtimes:
+ * - Single CDK-managed AgentCore Runtime with Cognito JWT Authorizer
  * - AgentCore Memory for conversation context and memory
  * - Code Interpreter Custom for Python code execution
  * - Browser Custom for web browsing capabilities
  * - IAM roles with appropriate permissions
  * 
- * Note: Individual runtimes are created dynamically by Lambda when auth providers are added.
  * Note: ECR repository is created by the build pipeline, not by CDK.
  */
 export class InferenceApiStack extends cdk.Stack {
   public readonly memory: bedrock.CfnMemory;
   public readonly codeInterpreter: bedrock.CfnCodeInterpreterCustom;
   public readonly browser: bedrock.CfnBrowserCustom;
+  public readonly runtime: bedrock.CfnRuntime;
 
   constructor(scope: Construct, id: string, props: InferenceApiStackProps) {
     super(scope, id, props);
@@ -148,6 +149,19 @@ export class InferenceApiStack extends cdk.Stack {
         `arn:aws:bedrock:*::foundation-model/*`,
         `arn:aws:bedrock:${config.awsRegion}:${config.awsAccount}:*`,
       ],
+    }));
+
+    // AWS Marketplace permissions required for Bedrock model access
+    // Some foundation models (e.g., Anthropic Claude) require marketplace
+    // subscription validation before invocation is allowed.
+    runtimeExecutionRole.addToPolicy(new iam.PolicyStatement({
+      sid: 'MarketplaceModelAccess',
+      effect: iam.Effect.ALLOW,
+      actions: [
+        'aws-marketplace:ViewSubscriptions',
+        'aws-marketplace:Subscribe',
+      ],
+      resources: ['*'],
     }));
 
     // External MCP Lambda Function URL permissions (for external MCP tools with aws-iam auth)
@@ -783,6 +797,168 @@ export class InferenceApiStack extends cdk.Stack {
     }));
 
     // ============================================================
+    // Import Cognito SSM Parameters for JWT Authorizer
+    // ============================================================
+
+    const cognitoUserPoolId = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/auth/cognito/user-pool-id`
+    );
+    const cognitoAppClientId = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/auth/cognito/app-client-id`
+    );
+
+    // Construct Cognito OIDC discovery URL
+    const cognitoDiscoveryUrl = `https://cognito-idp.${config.awsRegion}.amazonaws.com/${cognitoUserPoolId}/.well-known/openid-configuration`;
+
+    // ============================================================
+    // Import SSM Parameters for Runtime Environment Variables
+    // ============================================================
+
+    // DynamoDB table names (the ARNs are already imported above for IAM)
+    const usersTableName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/users/users-table-name`
+    );
+    const appRolesTableName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/rbac/app-roles-table-name`
+    );
+    const oidcStateTableName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/auth/oidc-state-table-name`
+    );
+    const apiKeysTableName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/auth/api-keys-table-name`
+    );
+    const oauthProvidersTableName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/oauth/providers-table-name`
+    );
+    const oauthUserTokensTableName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/oauth/user-tokens-table-name`
+    );
+    const assistantsTableName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/rag/assistants-table-name`
+    );
+    const userQuotasTableName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/quota/user-quotas-table-name`
+    );
+    const quotaEventsTableName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/quota/quota-events-table-name`
+    );
+    const sessionsMetadataTableName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/cost-tracking/sessions-metadata-table-name`
+    );
+    const userCostSummaryTableName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/cost-tracking/user-cost-summary-table-name`
+    );
+    const systemCostRollupTableName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/cost-tracking/system-cost-rollup-table-name`
+    );
+    const managedModelsTableName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/admin/managed-models-table-name`
+    );
+    const userSettingsTableName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/settings/user-settings-table-name`
+    );
+    const authProvidersTableName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/auth/auth-providers-table-name`
+    );
+    const userFilesTableName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/user-file-uploads/table-name`
+    );
+
+    // S3 / RAG
+    const vectorBucketName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/rag/vector-bucket-name`
+    );
+    const vectorIndexName = ssm.StringParameter.valueForStringParameter(
+      this, `/${config.projectPrefix}/rag/vector-index-name`
+    );
+
+    // Frontend CORS origins — single source: buildCorsOrigins (from CDK_DOMAIN_NAME)
+    const corsOrigins = buildCorsOrigins(config, config.inferenceApi.additionalCorsOrigins).join(',');
+
+    // ============================================================
+    // Single CDK-Managed AgentCore Runtime with Cognito JWT Authorizer
+    // ============================================================
+
+    this.runtime = new bedrock.CfnRuntime(this, 'AgentCoreRuntime', {
+      agentRuntimeName: getResourceName(config, 'agentcore_runtime').replace(/-/g, '_'),
+      agentRuntimeArtifact: {
+        containerConfiguration: {
+          containerUri: _containerImageUri,
+        },
+      },
+      authorizerConfiguration: {
+        customJwtAuthorizer: {
+          discoveryUrl: cognitoDiscoveryUrl,
+          allowedClients: [cognitoAppClientId],
+        },
+      },
+      roleArn: runtimeExecutionRole.roleArn,
+      networkConfiguration: {
+        networkMode: 'PUBLIC',
+      },
+      requestHeaderConfiguration: {
+        requestHeaderAllowlist: ['Authorization'],
+      },
+      environmentVariables: {
+        // Basic configuration
+        LOG_LEVEL: 'INFO',
+        PROJECT_PREFIX: config.projectPrefix,
+        AWS_DEFAULT_REGION: config.awsRegion,
+
+        // DynamoDB tables
+        DYNAMODB_USERS_TABLE_NAME: usersTableName,
+        DYNAMODB_APP_ROLES_TABLE_NAME: appRolesTableName,
+        DYNAMODB_OIDC_STATE_TABLE_NAME: oidcStateTableName,
+        DYNAMODB_API_KEYS_TABLE_NAME: apiKeysTableName,
+        DYNAMODB_OAUTH_PROVIDERS_TABLE_NAME: oauthProvidersTableName,
+        DYNAMODB_OAUTH_USER_TOKENS_TABLE_NAME: oauthUserTokensTableName,
+        DYNAMODB_ASSISTANTS_TABLE_NAME: assistantsTableName,
+
+        // Quota & cost tracking tables
+        DYNAMODB_QUOTA_TABLE: userQuotasTableName,
+        DYNAMODB_QUOTA_EVENTS_TABLE: quotaEventsTableName,
+        DYNAMODB_SESSIONS_METADATA_TABLE_NAME: sessionsMetadataTableName,
+        DYNAMODB_COST_SUMMARY_TABLE_NAME: userCostSummaryTableName,
+        DYNAMODB_SYSTEM_ROLLUP_TABLE_NAME: systemCostRollupTableName,
+        DYNAMODB_MANAGED_MODELS_TABLE_NAME: managedModelsTableName,
+        DYNAMODB_USER_SETTINGS_TABLE_NAME: userSettingsTableName,
+        DYNAMODB_USER_FILES_TABLE_NAME: userFilesTableName,
+
+        // Auth providers
+        DYNAMODB_AUTH_PROVIDERS_TABLE_NAME: authProvidersTableName,
+        AUTH_PROVIDER_SECRETS_ARN: authProviderSecretsArn,
+
+        // OAuth configuration
+        OAUTH_TOKEN_ENCRYPTION_KEY_ARN: oauthTokenEncryptionKeyArn,
+        OAUTH_CLIENT_SECRETS_ARN: oauthClientSecretsArn,
+
+        // AgentCore resources
+        AGENTCORE_MEMORY_ID: this.memory.attrMemoryId,
+        MEMORY_ARN: this.memory.attrMemoryArn,
+        AGENTCORE_CODE_INTERPRETER_ID: this.codeInterpreter.attrCodeInterpreterId,
+        BROWSER_ID: this.browser.attrBrowserId,
+
+        // S3 storage
+        S3_ASSISTANTS_VECTOR_STORE_BUCKET_NAME: vectorBucketName,
+        S3_ASSISTANTS_VECTOR_STORE_INDEX_NAME: vectorIndexName,
+
+        // Authentication
+        ENABLE_AUTHENTICATION: 'true',
+        ENABLE_QUOTA_ENFORCEMENT: 'true',
+
+        // Directories
+        UPLOAD_DIR: '/tmp/uploads',
+        OUTPUT_DIR: '/tmp/output',
+        GENERATED_IMAGES_DIR: '/tmp/generated_images',
+
+        // URLs
+        FRONTEND_URL: config.domainName ? `https://${config.domainName}` : 'http://localhost:4200',
+        CORS_ORIGINS: corsOrigins,
+      },
+    });
+    this.runtime.node.addDependency(runtimeExecutionRole);
+
+    // ============================================================
     // Observability: CloudWatch Log Group for Runtime
     // ============================================================
 
@@ -801,8 +977,6 @@ export class InferenceApiStack extends cdk.Stack {
     // ============================================================
     // Uses CloudWatch Logs vended logs API (CfnDeliverySource/Destination/Delivery)
     // to configure APPLICATION_LOGS and TRACES for CDK-managed resources.
-    // Runtime log deliveries are configured in the runtime-provisioner Lambda
-    // since runtimes are created dynamically per auth provider.
 
     // --- Memory: APPLICATION_LOGS ---
     const memoryLogsLogGroup = new logs.LogGroup(this, 'MemoryLogsLogGroup', {
@@ -1028,6 +1202,33 @@ export class InferenceApiStack extends cdk.Stack {
       description: 'Runtime execution role ARN for Lambda-created AgentCore Runtimes',
       tier: ssm.ParameterTier.STANDARD,
     });
+
+    new ssm.StringParameter(this, 'RuntimeArnParameter', {
+      parameterName: `/${config.projectPrefix}/inference-api/runtime-arn`,
+      stringValue: this.runtime.attrAgentRuntimeArn,
+      description: 'AgentCore Runtime ARN',
+      tier: ssm.ParameterTier.STANDARD,
+    });
+
+    new ssm.StringParameter(this, 'RuntimeIdParameter', {
+      parameterName: `/${config.projectPrefix}/inference-api/runtime-id`,
+      stringValue: this.runtime.attrAgentRuntimeId,
+      description: 'AgentCore Runtime ID',
+      tier: ssm.ParameterTier.STANDARD,
+    });
+
+    // Construct the full runtime endpoint URL for frontend consumption
+    const runtimeEndpointUrl = cdk.Fn.sub(
+      'https://bedrock-agentcore.${AWS::Region}.amazonaws.com/runtimes/${RuntimeArn}',
+      { RuntimeArn: this.runtime.attrAgentRuntimeArn }
+    );
+
+    new ssm.StringParameter(this, 'InferenceApiRuntimeEndpointUrlParameter', {
+      parameterName: `/${config.projectPrefix}/inference-api/runtime-endpoint-url`,
+      stringValue: runtimeEndpointUrl,
+      description: 'Inference API AgentCore Runtime Endpoint URL',
+      tier: ssm.ParameterTier.STANDARD,
+    });
     
     new ssm.StringParameter(this, 'InferenceApiMemoryArnParameter', {
       parameterName: `/${config.projectPrefix}/inference-api/memory-arn`,
@@ -1096,6 +1297,18 @@ export class InferenceApiStack extends cdk.Stack {
       value: this.memory.attrMemoryArn,
       description: 'Inference API AgentCore Memory ARN',
       exportName: `${config.projectPrefix}-InferenceApiMemoryArn`,
+    });
+
+    new cdk.CfnOutput(this, 'AgentCoreRuntimeArn', {
+      value: this.runtime.attrAgentRuntimeArn,
+      description: 'AgentCore Runtime ARN',
+      exportName: `${config.projectPrefix}-AgentCoreRuntimeArn`,
+    });
+
+    new cdk.CfnOutput(this, 'AgentCoreRuntimeId', {
+      value: this.runtime.attrAgentRuntimeId,
+      description: 'AgentCore Runtime ID',
+      exportName: `${config.projectPrefix}-AgentCoreRuntimeId`,
     });
 
     new cdk.CfnOutput(this, 'InferenceApiMemoryId', {

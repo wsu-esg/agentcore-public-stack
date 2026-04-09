@@ -152,9 +152,6 @@ build_cdk_context_params() {
     if [ -n "${ENV_INFERENCE_API_LOG_LEVEL:-}" ]; then
         context_params="${context_params} --context inferenceApi.logLevel=\"${ENV_INFERENCE_API_LOG_LEVEL}\""
     fi
-    if [ -n "${ENV_INFERENCE_API_CORS_ORIGINS:-}" ]; then
-        context_params="${context_params} --context inferenceApi.corsOrigins=\"${ENV_INFERENCE_API_CORS_ORIGINS}\""
-    fi
 
     # Gateway optional parameters
     if [ -n "${CDK_GATEWAY_ENABLED:-}" ]; then
@@ -274,6 +271,9 @@ export CDK_RAG_LAMBDA_TIMEOUT="${CDK_RAG_LAMBDA_TIMEOUT:-$(get_json_value "ragIn
 
 # SageMaker Fine-Tuning configuration
 export CDK_FINE_TUNING_ENABLED="${CDK_FINE_TUNING_ENABLED:-$(get_json_value "fineTuning.enabled" "${CONTEXT_FILE}")}"
+
+# Cognito configuration (optional — defaults to projectPrefix for domain prefix)
+export CDK_COGNITO_DOMAIN_PREFIX="${CDK_COGNITO_DOMAIN_PREFIX:-$(get_json_value "cognito.domainPrefix" "${CONTEXT_FILE}")}"
 
 # AWS Account - try multiple sources (env vars take precedence)
 CDK_CONTEXT_ACCOUNT=$(get_json_value "awsAccount" "${CONTEXT_FILE}")

@@ -51,7 +51,6 @@ describe('RagIngestionStack', () => {
         maxCapacity: 4,
         imageTag: 'latest',
         logLevel: 'INFO',
-        corsOrigins: 'http://localhost:3000',
       },
       gateway: {
         enabled: true,
@@ -69,11 +68,11 @@ describe('RagIngestionStack', () => {
       },
       assistants: {
         enabled: true,
-        corsOrigins: 'http://localhost:3000,https://example.com',
+        additionalCorsOrigins: 'http://localhost:3000,https://example.com',
       },
       ragIngestion: {
         enabled: true,
-        corsOrigins: 'http://localhost:3000,https://example.com',
+        additionalCorsOrigins: 'http://localhost:3000,https://example.com',
         lambdaMemorySize: 3008,
         lambdaTimeout: 900,
         embeddingModel: 'amazon.titan-embed-text-v2',
@@ -83,6 +82,10 @@ describe('RagIngestionStack', () => {
       fineTuning: {
         enabled: false,
         defaultQuotaHours: 0,
+      },
+      cognito: {
+        domainPrefix: 'test-project',
+        passwordMinLength: 8,
       },
       tags: {
         ManagedBy: 'CDK',
@@ -114,7 +117,7 @@ describe('RagIngestionStack', () => {
   describe('S3 Documents Bucket', () => {
     test('creates S3 bucket with correct name', () => {
       template.hasResourceProperties('AWS::S3::Bucket', {
-        BucketName: 'test-project-rag-documents',
+        BucketName: 'test-project-rag-documents-123456789012',
       });
     });
 
@@ -175,13 +178,13 @@ describe('RagIngestionStack', () => {
   describe('S3 Vectors Bucket and Index', () => {
     test('creates S3 Vectors bucket with correct name', () => {
       template.hasResourceProperties('AWS::S3Vectors::VectorBucket', {
-        VectorBucketName: 'test-project-rag-vector-store-v1',
+        VectorBucketName: 'test-project-rag-vector-store-v1-123456789012',
       });
     });
 
     test('creates vector index with correct configuration', () => {
       template.hasResourceProperties('AWS::S3Vectors::Index', {
-        VectorBucketName: 'test-project-rag-vector-store-v1',
+        VectorBucketName: 'test-project-rag-vector-store-v1-123456789012',
         IndexName: 'test-project-rag-vector-index-v1',
         DataType: 'float32',
         Dimension: 1024,
@@ -409,7 +412,7 @@ describe('RagIngestionStack', () => {
           Variables: {
             S3_ASSISTANTS_DOCUMENTS_BUCKET_NAME: Match.anyValue(),
             DYNAMODB_ASSISTANTS_TABLE_NAME: Match.anyValue(),
-            S3_ASSISTANTS_VECTOR_STORE_BUCKET_NAME: 'test-project-rag-vector-store-v1',
+            S3_ASSISTANTS_VECTOR_STORE_BUCKET_NAME: 'test-project-rag-vector-store-v1-123456789012',
             S3_ASSISTANTS_VECTOR_STORE_INDEX_NAME: 'test-project-rag-vector-index-v1',
             BEDROCK_REGION: 'us-east-1',
           },
@@ -497,8 +500,8 @@ describe('RagIngestionStack', () => {
               ],
               Effect: 'Allow',
               Resource: Match.arrayWith([
-                Match.stringLikeRegexp('arn:aws:s3vectors:.*:.*:bucket/.*rag-vector-store-v1'),
-                Match.stringLikeRegexp('arn:aws:s3vectors:.*:.*:bucket/.*rag-vector-store-v1/index/.*rag-vector-index-v1'),
+                Match.stringLikeRegexp('arn:aws:s3vectors:.*:.*:bucket/.*rag-vector-store-v1.*'),
+                Match.stringLikeRegexp('arn:aws:s3vectors:.*:.*:bucket/.*rag-vector-store-v1.*/index/.*rag-vector-index-v1'),
               ]),
             }),
           ]),
@@ -605,7 +608,7 @@ describe('RagIngestionStack', () => {
       template.hasResourceProperties('AWS::SSM::Parameter', {
         Name: '/test-project/rag/vector-bucket-name',
         Type: 'String',
-        Value: 'test-project-rag-vector-store-v1',
+        Value: 'test-project-rag-vector-store-v1-123456789012',
         Description: 'RAG vector store bucket name',
       });
     });
@@ -754,7 +757,7 @@ describe('RagIngestionStack', () => {
         (r: any) => r.Type === 'AWS::DynamoDB::Table'
       ) as any;
       const lambda = Object.values(resources).find(
-        (r: any) => r.Type === 'AWS::Lambda::Function'
+        (r: any) => r.Type === 'AWS::Lambda::Function' && r.Properties?.FunctionName
       ) as any;
 
       expect(bucket.Properties.BucketName).toContain('rag-documents');

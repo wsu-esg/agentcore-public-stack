@@ -8,7 +8,7 @@
   "awsAccount": "",
   "awsRegion": "us-west-2",
   "vpcCidr": "10.0.0.0/16",
-  "corsOrigins": "http://localhost:4200,http://localhost:8000",
+  "corsOrigins": "",
   "domainName": "",
   "infrastructureHostedZoneDomain": "",
   "albSubdomain": "",
@@ -33,8 +33,7 @@
     "memory": 2048,
     "desiredCount": 1,
     "maxCapacity": 5,
-    "logLevel": "INFO",
-    "corsOrigins": ""
+    "logLevel": "INFO"
   },
   "gateway": {
     "enabled": true,

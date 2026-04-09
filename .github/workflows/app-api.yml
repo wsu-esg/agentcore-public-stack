@@ -255,6 +255,7 @@ jobs:
     name: Synthesize CDK
     runs-on: ubuntu-24.04-arm  # Use ARM64-native runner for ARM64 Lambda builds
     needs: build-cdk
+    if: github.event_name != 'pull_request'
     
     # Select environment based on trigger
     # Manual: workflow_dispatch input
@@ -270,6 +271,7 @@ jobs:
       CDK_AWS_REGION: ${{ vars.AWS_REGION }}
       CDK_PROJECT_PREFIX: ${{ vars.CDK_PROJECT_PREFIX }}
       CDK_DOMAIN_NAME: ${{ vars.CDK_DOMAIN_NAME }}
+      CDK_CORS_ORIGINS: ${{ vars.CDK_CORS_ORIGINS }}
       CDK_VPC_CIDR: ${{ vars.CDK_VPC_CIDR }}
       CDK_HOSTED_ZONE_DOMAIN: ${{ vars.CDK_HOSTED_ZONE_DOMAIN }}
       CDK_APP_API_ENABLED: ${{ vars.CDK_APP_API_ENABLED }}
@@ -345,6 +347,7 @@ jobs:
       CDK_AWS_REGION: ${{ vars.AWS_REGION }}
       CDK_PROJECT_PREFIX: ${{ vars.CDK_PROJECT_PREFIX }}
       CDK_DOMAIN_NAME: ${{ vars.CDK_DOMAIN_NAME }}
+      CDK_CORS_ORIGINS: ${{ vars.CDK_CORS_ORIGINS }}
       CDK_AWS_ACCOUNT: ${{ vars.CDK_AWS_ACCOUNT }}
       AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -468,6 +471,7 @@ jobs:
       CDK_AWS_REGION: ${{ vars.AWS_REGION }}
       CDK_PROJECT_PREFIX: ${{ vars.CDK_PROJECT_PREFIX }}
       CDK_DOMAIN_NAME: ${{ vars.CDK_DOMAIN_NAME }}
+      CDK_CORS_ORIGINS: ${{ vars.CDK_CORS_ORIGINS }}
       CDK_VPC_CIDR: ${{ vars.CDK_VPC_CIDR }}
       CDK_HOSTED_ZONE_DOMAIN: ${{ vars.CDK_HOSTED_ZONE_DOMAIN }}
       CDK_APP_API_ENABLED: ${{ vars.CDK_APP_API_ENABLED }}

@@ -117,19 +117,15 @@ app.add_middleware(
 )
 logger.info("Added GZip middleware for response compression")
 
-# Add CORS middleware for local development
-# In production (AWS), CloudFront handles routing so CORS is not needed
-if os.getenv('ENVIRONMENT', 'development') == 'development':
-    logger.info("Adding CORS middleware for local development")
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=[
-            "http://localhost:4200",  # Frontend dev server
-        ],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# Add CORS middleware - origins from CDK-provided CORS_ORIGINS env var
+_cors_origins = os.environ.get("CORS_ORIGINS", "").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in _cors_origins if o.strip()],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Import routers
 #from health.health import router as health_router

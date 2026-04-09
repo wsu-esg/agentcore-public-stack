@@ -47,7 +47,6 @@ export function createMockConfig(overrides: Partial<AppConfig> = {}): AppConfig 
       maxCapacity: 2,
       imageTag: 'latest',
       logLevel: 'INFO',
-      corsOrigins: 'http://localhost:4200',
     },
     gateway: {
       enabled: true,
@@ -58,7 +57,6 @@ export function createMockConfig(overrides: Partial<AppConfig> = {}): AppConfig 
     },
     assistants: {
       enabled: true,
-      corsOrigins: 'http://localhost:4200',
     },
     fileUpload: {
       enabled: true,
@@ -69,7 +67,6 @@ export function createMockConfig(overrides: Partial<AppConfig> = {}): AppConfig 
     },
     ragIngestion: {
       enabled: true,
-      corsOrigins: 'http://localhost:4200',
       lambdaMemorySize: 3008,
       lambdaTimeout: 900,
       embeddingModel: 'amazon.titan-embed-text-v2',
@@ -79,6 +76,10 @@ export function createMockConfig(overrides: Partial<AppConfig> = {}): AppConfig 
     fineTuning: {
       enabled: false,
       defaultQuotaHours: 0,
+    },
+    cognito: {
+      domainPrefix: MOCK_PREFIX,
+      passwordMinLength: 8,
     },
     tags: { ManagedBy: 'CDK', Environment: 'test' },
   };
@@ -133,6 +134,8 @@ const SSM_READS_BY_STACK: Record<string, string[]> = {
     'auth/auth-provider-secrets-arn',
     'user-file-uploads/table-arn',
     'user-file-uploads/bucket-arn',
+    'auth/cognito/user-pool-id',
+    'auth/cognito/app-client-id',
   ],
   AppApiStack: [
     'network/vpc-id',
@@ -173,8 +176,12 @@ const SSM_READS_BY_STACK: Record<string, string[]> = {
     'admin/managed-models-table-arn',
     'auth/auth-providers-table-name',
     'auth/auth-providers-table-arn',
-    'auth/auth-providers-stream-arn',
     'auth/auth-provider-secrets-arn',
+    'auth/cognito/user-pool-arn',
+    'auth/cognito/user-pool-id',
+    'auth/cognito/app-client-id',
+    'auth/cognito/issuer-url',
+    'auth/cognito/domain-url',
     'rag/documents-bucket-name',
     'rag/assistants-table-name',
     'rag/vector-bucket-name',
@@ -182,7 +189,6 @@ const SSM_READS_BY_STACK: Record<string, string[]> = {
     'inference-api/memory-id',
     'rag/documents-bucket-arn',
     'rag/assistants-table-arn',
-    'inference-api/runtime-execution-role-arn',
     'inference-api/memory-arn',
     'fine-tuning/jobs-table-name',
     'fine-tuning/jobs-table-arn',
@@ -258,6 +264,9 @@ function getMockValueForParam(suffix: string): string {
   if (suffix.includes('index-name')) return 'mock-vector-index';
   if (suffix.includes('lambda') || suffix.includes('provisioner') || suffix.includes('updater')) return 'arn:aws:lambda:us-east-1:123456789012:function:mock-fn';
   if (suffix.includes('url')) return 'https://mock-api.example.com';
+  if (suffix.includes('user-pool-arn')) return 'arn:aws:cognito-idp:us-east-1:123456789012:userpool/us-east-1_MockPool';
+  if (suffix.includes('user-pool-id')) return 'us-east-1_MockPool';
+  if (suffix.includes('app-client-id')) return 'mock-app-client-id';
   if (suffix.includes('cors')) return 'http://localhost:4200';
   return 'mock-value';
 }

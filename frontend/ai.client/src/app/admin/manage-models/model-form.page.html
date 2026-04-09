@@ -461,7 +461,50 @@
       </div>
 
       <!-- Form Actions -->
-      <div class="flex gap-3 border-t border-gray-200 pt-6 dark:border-gray-700">
+      <div class="flex flex-col gap-4 border-t border-gray-200 pt-6 dark:border-gray-700">
+        @if (modelForm.invalid) {
+          <div class="rounded-sm border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-900/20">
+            <p class="text-sm/6 font-medium text-amber-800 dark:text-amber-200">
+              Please fix the following before saving:
+            </p>
+            <ul class="mt-1 list-inside list-disc text-sm/6 text-amber-700 dark:text-amber-300">
+              @if (modelForm.controls.modelId.invalid) {
+                <li>Model ID is required</li>
+              }
+              @if (modelForm.controls.modelName.invalid) {
+                <li>Model Name is required</li>
+              }
+              @if (modelForm.controls.provider.invalid) {
+                <li>Provider is required</li>
+              }
+              @if (modelForm.controls.providerName.invalid) {
+                <li>Provider Name is required</li>
+              }
+              @if (modelForm.controls.inputModalities.invalid) {
+                <li>Select at least one input modality</li>
+              }
+              @if (modelForm.controls.outputModalities.invalid) {
+                <li>Select at least one output modality</li>
+              }
+              @if (modelForm.controls.maxInputTokens.invalid) {
+                <li>Max Input Tokens must be 1 or greater</li>
+              }
+              @if (modelForm.controls.maxOutputTokens.invalid) {
+                <li>Max Output Tokens must be 1 or greater</li>
+              }
+              @if (modelForm.controls.allowedAppRoles.invalid) {
+                <li>Select at least one allowed role</li>
+              }
+              @if (modelForm.controls.inputPricePerMillionTokens.invalid) {
+                <li>Input price is required (0 or greater)</li>
+              }
+              @if (modelForm.controls.outputPricePerMillionTokens.invalid) {
+                <li>Output price is required (0 or greater)</li>
+              }
+            </ul>
+          </div>
+        }
+        <div class="flex gap-3">
         <button
           type="submit"
           [disabled]="isSubmitting() || modelForm.invalid"
@@ -481,6 +524,7 @@
         >
           Cancel
         </button>
+        </div>
       </div>
     </form>
   </div>

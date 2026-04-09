@@ -100,6 +100,18 @@ describe('AppApiStack', () => {
         ]),
       });
     });
+
+    test('container environment includes CORS_ORIGINS derived from domainName', () => {
+      template.hasResourceProperties('AWS::ECS::TaskDefinition', {
+        ContainerDefinitions: Match.arrayWith([
+          Match.objectLike({
+            Environment: Match.arrayWith([
+              Match.objectLike({ Name: 'CORS_ORIGINS' }),
+            ]),
+          }),
+        ]),
+      });
+    });
   });
 
   // ============================================================
@@ -131,118 +143,6 @@ describe('AppApiStack', () => {
 
     test('creates exactly 1 DynamoDB table (UserFiles moved to InfrastructureStack)', () => {
       template.resourceCountIs('AWS::DynamoDB::Table', 1);
-    });
-  });
-
-  // ============================================================
-  // S3 Buckets
-  // ============================================================
-
-  describe('S3 Buckets', () => {
-    test('creates AssistantsDocumentBucket with versioning', () => {
-      template.hasResourceProperties('AWS::S3::Bucket', {
-        BucketName: `${config.projectPrefix}-assistants-documents`,
-        VersioningConfiguration: { Status: 'Enabled' },
-      });
-    });
-
-    test('AssistantsDocumentBucket has CORS configuration', () => {
-      template.hasResourceProperties('AWS::S3::Bucket', {
-        BucketName: `${config.projectPrefix}-assistants-documents`,
-        CorsConfiguration: {
-          CorsRules: Match.arrayWith([
-            Match.objectLike({
-              AllowedMethods: ['GET', 'PUT', 'HEAD'],
-              AllowedHeaders: ['Content-Type', 'Content-Length', 'x-amz-*'],
-            }),
-          ]),
-        },
-      });
-    });
-
-    test('creates exactly 1 S3 bucket (UserFiles moved to InfrastructureStack)', () => {
-      template.resourceCountIs('AWS::S3::Bucket', 1);
-    });
-  });
-
-  // ============================================================
-  // S3 Vector Store Resources
-  // ============================================================
-
-  describe('S3 Vector Store', () => {
-    test('creates S3 Vector Bucket', () => {
-      template.hasResourceProperties('AWS::S3Vectors::VectorBucket', {
-        VectorBucketName: `${config.projectPrefix}-assistants-vector-store-v1`,
-      });
-    });
-
-    test('creates S3 Vector Index with correct config', () => {
-      template.hasResourceProperties('AWS::S3Vectors::Index', {
-        VectorBucketName: `${config.projectPrefix}-assistants-vector-store-v1`,
-        IndexName: `${config.projectPrefix}-assistants-vector-index-v1`,
-        DataType: 'float32',
-        Dimension: 1024,
-        DistanceMetric: 'cosine',
-      });
-    });
-  });
-
-  // ============================================================
-  // Lambda Functions
-  // ============================================================
-
-  describe('Lambda Functions', () => {
-    test('creates RuntimeProvisioner function', () => {
-      template.hasResourceProperties('AWS::Lambda::Function', {
-        FunctionName: `${config.projectPrefix}-runtime-provisioner`,
-        Runtime: 'python3.14',
-        Handler: 'lambda_function.lambda_handler',
-        MemorySize: 512,
-        Timeout: 300,
-        Architectures: ['arm64'],
-      });
-    });
-
-    test('creates RuntimeUpdater function', () => {
-      template.hasResourceProperties('AWS::Lambda::Function', {
-        FunctionName: `${config.projectPrefix}-runtime-updater`,
-        Runtime: 'python3.14',
-        Handler: 'lambda_function.lambda_handler',
-        MemorySize: 512,
-        Timeout: 900,
-        Architectures: ['arm64'],
-      });
-    });
-
-    test('creates at least 2 Lambda functions', () => {
-      const lambdas = template.findResources('AWS::Lambda::Function');
-      expect(Object.keys(lambdas).length).toBeGreaterThanOrEqual(2);
-    });
-
-    test('RuntimeProvisioner has DynamoDB event source mapping', () => {
-      template.hasResourceProperties('AWS::Lambda::EventSourceMapping', {
-        BatchSize: 1,
-        BisectBatchOnFunctionError: true,
-        MaximumRetryAttempts: 3,
-        StartingPosition: 'LATEST',
-      });
-    });
-  });
-
-  // ============================================================
-  // SNS Topic
-  // ============================================================
-
-  describe('SNS Topic', () => {
-    test('creates runtime update alerts topic', () => {
-      template.hasResourceProperties('AWS::SNS::Topic', {
-        TopicName: `${config.projectPrefix}-runtime-update-alerts`,
-        DisplayName: 'AgentCore Runtime Update Alerts',
-      });
-    });
-
-    test('creates exactly 1 SNS topic', () => {
-      template.resourceCountIs('AWS::SNS::Topic', 1);
     });
   });
 
@@ -285,29 +185,8 @@ describe('AppApiStack', () => {
   // ============================================================
 
   describe('SSM Parameters', () => {
-    test('exports 3 SSM parameters (file-upload params moved to InfrastructureStack)', () => {
-      template.resourceCountIs('AWS::SSM::Parameter', 3);
-    });
-
-    test('exports lambda/runtime-provisioner-arn', () => {
-      template.hasResourceProperties('AWS::SSM::Parameter', {
-        Name: `/${config.projectPrefix}/lambda/runtime-provisioner-arn`,
-        Type: 'String',
-      });
-    });
-
-    test('exports lambda/runtime-updater-arn', () => {
-      template.hasResourceProperties('AWS::SSM::Parameter', {
-        Name: `/${config.projectPrefix}/lambda/runtime-updater-arn`,
-        Type: 'String',
-      });
-    });
-
-    test('exports sns/runtime-update-alerts-arn', () => {
-      template.hasResourceProperties('AWS::SSM::Parameter', {
-        Name: `/${config.projectPrefix}/sns/runtime-update-alerts-arn`,
-        Type: 'String',
-      });
+    test('exports 0 SSM parameters (runtime provisioner/updater removed)', () => {
+      template.resourceCountIs('AWS::SSM::Parameter', 0);
     });
   });
 
@@ -380,21 +259,6 @@ describe('AppApiStack', () => {
     test('creates ECS security group', () => {
       template.hasResourceProperties('AWS::EC2::SecurityGroup', {
         GroupDescription: 'Security group for App API ECS Fargate tasks',
-      });
-    });
-  });
-
-  // ============================================================
-  // EventBridge Rule
-  // ============================================================
-
-  describe('EventBridge Rule', () => {
-    test('creates rule for SSM parameter change detection', () => {
-      template.hasResourceProperties('AWS::Events::Rule', {
-        EventPattern: Match.objectLike({
-          source: ['aws.ssm'],
-          'detail-type': ['Parameter Store Change'],
-        }),
       });
     });
   });

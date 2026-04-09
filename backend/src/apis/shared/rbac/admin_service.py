@@ -124,14 +124,19 @@ class AppRoleAdminService:
 
         # System role protection
         if existing.is_system_role and role_id == "system_admin":
-            # For system_admin, only allow updating display_name and description
-            allowed_fields = {"display_name", "description"}
+            # For system_admin, only allow updating display_name, description,
+            # and jwt_role_mappings. Silently drop other fields so the frontend
+            # can send its full form payload without triggering errors.
+            allowed_fields = {"display_name", "description", "jwt_role_mappings"}
             update_dict = updates.model_dump(exclude_unset=True)
-            invalid_fields = set(update_dict.keys()) - allowed_fields
-            if invalid_fields:
-                raise ValueError(
-                    f"Cannot modify protected fields on system_admin role: {invalid_fields}"
+            blocked_fields = set(update_dict.keys()) - allowed_fields
+            if blocked_fields:
+                logger.info(
+                    f"Stripping protected fields from system_admin update: {blocked_fields}"
                 )
+                # Rebuild updates with only allowed fields
+                filtered = {k: v for k, v in update_dict.items() if k in allowed_fields}
+                updates = AppRoleUpdate(**filtered)
 
         # Apply updates
         update_dict = updates.model_dump(exclude_unset=True, by_alias=False)

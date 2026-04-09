@@ -167,6 +167,8 @@ jobs:
       # Environment-scoped configuration
       CDK_AWS_REGION: ${{ vars.AWS_REGION }}
       CDK_PROJECT_PREFIX: ${{ vars.CDK_PROJECT_PREFIX }}
+      CDK_DOMAIN_NAME: ${{ vars.CDK_DOMAIN_NAME }}
+      CDK_CORS_ORIGINS: ${{ vars.CDK_CORS_ORIGINS }}
       CDK_RETAIN_DATA_ON_DELETE: ${{ vars.CDK_RETAIN_DATA_ON_DELETE }}
       CDK_GATEWAY_ENABLED: ${{ vars.CDK_GATEWAY_ENABLED }}
       CDK_GATEWAY_API_TYPE: ${{ vars.CDK_GATEWAY_API_TYPE }}
@@ -228,6 +230,8 @@ jobs:
       # Environment-scoped configuration
       CDK_AWS_REGION: ${{ vars.AWS_REGION }}
       CDK_PROJECT_PREFIX: ${{ vars.CDK_PROJECT_PREFIX }}
+      CDK_DOMAIN_NAME: ${{ vars.CDK_DOMAIN_NAME }}
+      CDK_CORS_ORIGINS: ${{ vars.CDK_CORS_ORIGINS }}
       CDK_RETAIN_DATA_ON_DELETE: ${{ vars.CDK_RETAIN_DATA_ON_DELETE }}
       CDK_GATEWAY_ENABLED: ${{ vars.CDK_GATEWAY_ENABLED }}
       CDK_GATEWAY_API_TYPE: ${{ vars.CDK_GATEWAY_API_TYPE }}
@@ -299,6 +303,8 @@ jobs:
       # Environment-scoped configuration
       CDK_AWS_REGION: ${{ vars.AWS_REGION }}
       CDK_PROJECT_PREFIX: ${{ vars.CDK_PROJECT_PREFIX }}
+      CDK_DOMAIN_NAME: ${{ vars.CDK_DOMAIN_NAME }}
+      CDK_CORS_ORIGINS: ${{ vars.CDK_CORS_ORIGINS }}
       CDK_RETAIN_DATA_ON_DELETE: ${{ vars.CDK_RETAIN_DATA_ON_DELETE }}
       CDK_GATEWAY_ENABLED: ${{ vars.CDK_GATEWAY_ENABLED }}
       CDK_GATEWAY_API_TYPE: ${{ vars.CDK_GATEWAY_API_TYPE }}

@@ -10,7 +10,7 @@ import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import { Construct } from 'constructs';
 import { CfnResource } from 'aws-cdk-lib';
-import { AppConfig, getResourceName, applyStandardTags, getRemovalPolicy, getAutoDeleteObjects } from './config';
+import { AppConfig, getResourceName, applyStandardTags, getRemovalPolicy, getAutoDeleteObjects, buildCorsOrigins } from './config';
 
 export interface RagIngestionStackProps extends cdk.StackProps {
   config: AppConfig;
@@ -86,21 +86,8 @@ export class RagIngestionStack extends cdk.Stack {
     // S3 Documents Bucket
     // ============================================================
 
-    // Build CORS origins: auto-include domain + localhost + any explicit config
-    const corsOrigins = new Set<string>();
-    corsOrigins.add('http://localhost:4200');
-    
-    // Use domainName if provided (custom domain)
-    if (config.domainName) {
-      corsOrigins.add(`https://${config.domainName}`);
-    }
-    
-    // Add any explicit CORS origins from config
-    if (config.ragIngestion.corsOrigins) {
-      config.ragIngestion.corsOrigins.split(',').map(o => o.trim()).filter(Boolean).forEach(o => corsOrigins.add(o));
-    }
-    
-    const ragCorsOrigins = Array.from(corsOrigins);
+    // Build CORS origins for RAG documents bucket
+    const ragCorsOrigins = buildCorsOrigins(config, config.ragIngestion.additionalCorsOrigins);
 
     this.documentsBucket = new s3.Bucket(this, 'RagDocumentsBucket', {
       bucketName: getResourceName(config, 'rag-documents', config.awsAccount),

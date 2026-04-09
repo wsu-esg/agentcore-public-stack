@@ -26,6 +26,7 @@ describe('RAG Ingestion Configuration', () => {
     app.node.setContext('awsRegion', 'us-east-1');
     app.node.setContext('awsAccount', '123456789012');
     app.node.setContext('vpcCidr', '10.0.0.0/16');
+    app.node.setContext('domainName', 'test.example.com');
 
     // Set default context for other required fields
     app.node.setContext('frontend', {
@@ -46,7 +47,6 @@ describe('RAG Ingestion Configuration', () => {
       desiredCount: 1,
       maxCapacity: 4,
       logLevel: 'INFO',
-      corsOrigins: 'http://localhost:3000',
     });
     app.node.setContext('gateway', {
       enabled: true,
@@ -57,7 +57,7 @@ describe('RAG Ingestion Configuration', () => {
     });
     app.node.setContext('assistants', {
       enabled: true,
-      corsOrigins: 'http://localhost:3000',
+      additionalCorsOrigins: 'http://localhost:3000',
     });
     app.node.setContext('fileUpload', {
       enabled: true,
@@ -65,7 +65,7 @@ describe('RAG Ingestion Configuration', () => {
       maxFilesPerMessage: 5,
       userQuotaBytes: 1073741824,
       retentionDays: 365,
-      corsOrigins: 'http://localhost:4200',
+      additionalCorsOrigins: 'http://localhost:4200',
     });
 
     // Set default ragIngestion context (mirrors cdk.context.json defaults)
@@ -73,7 +73,7 @@ describe('RAG Ingestion Configuration', () => {
     // provide context defaults for fields they don't explicitly set via env vars.
     app.node.setContext('ragIngestion', {
       enabled: true,
-      corsOrigins: '',
+      additionalCorsOrigins: '',
       lambdaMemorySize: 10240,
       lambdaTimeout: 900,
       embeddingModel: 'amazon.titan-embed-text-v2',
@@ -105,7 +105,7 @@ describe('RAG Ingestion Configuration', () => {
 
       const config = loadConfig(app);
 
-      expect(config.ragIngestion.corsOrigins).toBe('https://example.com,https://test.com');
+      expect(config.ragIngestion.additionalCorsOrigins).toBe('https://example.com,https://test.com');
     });
 
     test('loads Lambda memory size from CDK_RAG_LAMBDA_MEMORY environment variable', () => {
@@ -161,7 +161,7 @@ describe('RAG Ingestion Configuration', () => {
 
       expect(config.ragIngestion).toEqual({
         enabled: true,
-        corsOrigins: 'https://prod.example.com',
+        additionalCorsOrigins: 'https://prod.example.com',
         lambdaMemorySize: 10240,
         lambdaTimeout: 900,
         embeddingModel: 'amazon.titan-embed-text-v2',
@@ -179,7 +179,7 @@ describe('RAG Ingestion Configuration', () => {
     test('falls back to context value when environment variable not set', () => {
       app.node.setContext('ragIngestion', {
         enabled: false,
-        corsOrigins: 'https://context.example.com',
+        additionalCorsOrigins: 'https://context.example.com',
         lambdaMemorySize: 8192,
         lambdaTimeout: 600,
         embeddingModel: 'amazon.titan-embed-text-v1',
@@ -191,7 +191,7 @@ describe('RAG Ingestion Configuration', () => {
 
       expect(config.ragIngestion).toEqual({
         enabled: false,
-        corsOrigins: 'https://context.example.com',
+        additionalCorsOrigins: 'https://context.example.com',
         lambdaMemorySize: 8192,
         lambdaTimeout: 600,
         embeddingModel: 'amazon.titan-embed-text-v1',
@@ -203,7 +203,7 @@ describe('RAG Ingestion Configuration', () => {
     test('environment variable takes precedence over context', () => {
       app.node.setContext('ragIngestion', {
         enabled: false,
-        corsOrigins: 'https://context.example.com',
+        additionalCorsOrigins: 'https://context.example.com',
         lambdaMemorySize: 8192,
         lambdaTimeout: 900,
         embeddingModel: 'amazon.titan-embed-text-v2',
@@ -218,14 +218,14 @@ describe('RAG Ingestion Configuration', () => {
       const config = loadConfig(app);
 
       expect(config.ragIngestion.enabled).toBe(true);
-      expect(config.ragIngestion.corsOrigins).toBe('https://env.example.com');
+      expect(config.ragIngestion.additionalCorsOrigins).toBe('https://env.example.com');
       expect(config.ragIngestion.lambdaMemorySize).toBe(10240);
     });
 
     test('uses context for some values and env for others', () => {
       app.node.setContext('ragIngestion', {
         enabled: false,
-        corsOrigins: 'https://context.example.com',
+        additionalCorsOrigins: 'https://context.example.com',
         lambdaMemorySize: 8192,
         lambdaTimeout: 600,
         embeddingModel: 'amazon.titan-embed-text-v2',
@@ -239,7 +239,7 @@ describe('RAG Ingestion Configuration', () => {
       const config = loadConfig(app);
 
       expect(config.ragIngestion.enabled).toBe(true); // from env
-      expect(config.ragIngestion.corsOrigins).toBe('https://context.example.com'); // from context
+      expect(config.ragIngestion.additionalCorsOrigins).toBe('https://context.example.com'); // from context
       expect(config.ragIngestion.lambdaMemorySize).toBe(10240); // from env
       expect(config.ragIngestion.lambdaTimeout).toBe(600); // from context
     });
@@ -254,7 +254,7 @@ describe('RAG Ingestion Configuration', () => {
       const config = loadConfig(app);
 
       expect(config.ragIngestion.enabled).toBe(true);
-      expect(config.ragIngestion.corsOrigins).toBe('');
+      expect(config.ragIngestion.additionalCorsOrigins).toBe('');
       expect(config.ragIngestion.lambdaMemorySize).toBe(10240);
       expect(config.ragIngestion.lambdaTimeout).toBe(900);
       expect(config.ragIngestion.embeddingModel).toBe('amazon.titan-embed-text-v2');
@@ -271,7 +271,7 @@ describe('RAG Ingestion Configuration', () => {
     test('default CORS origins is empty string', () => {
       const config = loadConfig(app);
 
-      expect(config.ragIngestion.corsOrigins).toBe('');
+      expect(config.ragIngestion.additionalCorsOrigins).toBe('');
     });
 
     test('default Lambda memory is 10240 MB', () => {
@@ -335,15 +335,15 @@ describe('RAG Ingestion Configuration', () => {
       testApp.node.setContext('vpcCidr', '10.0.0.0/16');
       testApp.node.setContext('frontend', { enabled: true, cloudFrontPriceClass: 'PriceClass_100' });
       testApp.node.setContext('appApi', { enabled: true, cpu: 256, memory: 512, desiredCount: 1, maxCapacity: 4 });
-      testApp.node.setContext('inferenceApi', { enabled: true, cpu: 256, memory: 512, desiredCount: 1, maxCapacity: 4, logLevel: 'INFO', corsOrigins: 'http://localhost:3000' });
+      testApp.node.setContext('inferenceApi', { enabled: true, cpu: 256, memory: 512, desiredCount: 1, maxCapacity: 4, logLevel: 'INFO' });
       testApp.node.setContext('gateway', { enabled: true, apiType: 'REST', throttleRateLimit: 1000, throttleBurstLimit: 2000, enableWaf: false });
-      testApp.node.setContext('assistants', { enabled: true, corsOrigins: 'http://localhost:3000' });
+      testApp.node.setContext('assistants', { enabled: true, additionalCorsOrigins: 'http://localhost:3000' });
       testApp.node.setContext('fileUpload', { enabled: true, maxFileSizeBytes: 4194304, maxFilesPerMessage: 5, userQuotaBytes: 1073741824, retentionDays: 365 });
       
       process.env.CDK_RAG_ENABLED = 'true'; // Enable RAG to trigger validation
       testApp.node.setContext('ragIngestion', {
         enabled: true,
-        corsOrigins: '',
+        additionalCorsOrigins: '',
         lambdaMemorySize: 10240,
         lambdaTimeout: -1, // Negative (invalid)
         embeddingModel: 'amazon.titan-embed-text-v2',
@@ -365,15 +365,15 @@ describe('RAG Ingestion Configuration', () => {
       testApp.node.setContext('vpcCidr', '10.0.0.0/16');
       testApp.node.setContext('frontend', { enabled: true, cloudFrontPriceClass: 'PriceClass_100' });
       testApp.node.setContext('appApi', { enabled: true, cpu: 256, memory: 512, desiredCount: 1, maxCapacity: 4 });
-      testApp.node.setContext('inferenceApi', { enabled: true, cpu: 256, memory: 512, desiredCount: 1, maxCapacity: 4, logLevel: 'INFO', corsOrigins: 'http://localhost:3000' });
+      testApp.node.setContext('inferenceApi', { enabled: true, cpu: 256, memory: 512, desiredCount: 1, maxCapacity: 4, logLevel: 'INFO' });
       testApp.node.setContext('gateway', { enabled: true, apiType: 'REST', throttleRateLimit: 1000, throttleBurstLimit: 2000, enableWaf: false });
-      testApp.node.setContext('assistants', { enabled: true, corsOrigins: 'http://localhost:3000' });
+      testApp.node.setContext('assistants', { enabled: true, additionalCorsOrigins: 'http://localhost:3000' });
       testApp.node.setContext('fileUpload', { enabled: true, maxFileSizeBytes: 4194304, maxFilesPerMessage: 5, userQuotaBytes: 1073741824, retentionDays: 365 });
       
       process.env.CDK_RAG_ENABLED = 'true'; // Enable RAG to trigger validation
       testApp.node.setContext('ragIngestion', {
         enabled: true,
-        corsOrigins: '',
+        additionalCorsOrigins: '',
         lambdaMemorySize: 10240,
         lambdaTimeout: 1000, // Too high
         embeddingModel: 'amazon.titan-embed-text-v2',
@@ -395,15 +395,15 @@ describe('RAG Ingestion Configuration', () => {
       testApp.node.setContext('vpcCidr', '10.0.0.0/16');
       testApp.node.setContext('frontend', { enabled: true, cloudFrontPriceClass: 'PriceClass_100' });
       testApp.node.setContext('appApi', { enabled: true, cpu: 256, memory: 512, desiredCount: 1, maxCapacity: 4 });
-      testApp.node.setContext('inferenceApi', { enabled: true, cpu: 256, memory: 512, desiredCount: 1, maxCapacity: 4, logLevel: 'INFO', corsOrigins: 'http://localhost:3000' });
+      testApp.node.setContext('inferenceApi', { enabled: true, cpu: 256, memory: 512, desiredCount: 1, maxCapacity: 4, logLevel: 'INFO' });
       testApp.node.setContext('gateway', { enabled: true, apiType: 'REST', throttleRateLimit: 1000, throttleBurstLimit: 2000, enableWaf: false });
-      testApp.node.setContext('assistants', { enabled: true, corsOrigins: 'http://localhost:3000' });
+      testApp.node.setContext('assistants', { enabled: true, additionalCorsOrigins: 'http://localhost:3000' });
       testApp.node.setContext('fileUpload', { enabled: true, maxFileSizeBytes: 4194304, maxFilesPerMessage: 5, userQuotaBytes: 1073741824, retentionDays: 365 });
       
       process.env.CDK_RAG_ENABLED = 'true'; // Enable RAG to trigger validation
       testApp.node.setContext('ragIngestion', {
         enabled: true,
-        corsOrigins: '',
+        additionalCorsOrigins: '',
         lambdaMemorySize: 10240,
         lambdaTimeout: 900,
         embeddingModel: 'amazon.titan-embed-text-v2',
@@ -459,15 +459,15 @@ describe('RAG Ingestion Configuration', () => {
       testApp.node.setContext('vpcCidr', '10.0.0.0/16');
       testApp.node.setContext('frontend', { enabled: true, cloudFrontPriceClass: 'PriceClass_100' });
       testApp.node.setContext('appApi', { enabled: true, cpu: 256, memory: 512, desiredCount: 1, maxCapacity: 4 });
-      testApp.node.setContext('inferenceApi', { enabled: true, cpu: 256, memory: 512, desiredCount: 1, maxCapacity: 4, logLevel: 'INFO', corsOrigins: 'http://localhost:3000' });
+      testApp.node.setContext('inferenceApi', { enabled: true, cpu: 256, memory: 512, desiredCount: 1, maxCapacity: 4, logLevel: 'INFO' });
       testApp.node.setContext('gateway', { enabled: true, apiType: 'REST', throttleRateLimit: 1000, throttleBurstLimit: 2000, enableWaf: false });
-      testApp.node.setContext('assistants', { enabled: true, corsOrigins: 'http://localhost:3000' });
+      testApp.node.setContext('assistants', { enabled: true, additionalCorsOrigins: 'http://localhost:3000' });
       testApp.node.setContext('fileUpload', { enabled: true, maxFileSizeBytes: 4194304, maxFilesPerMessage: 5, userQuotaBytes: 1073741824, retentionDays: 365 });
       
       process.env.CDK_RAG_ENABLED = 'true'; // Enable RAG to trigger validation
       testApp.node.setContext('ragIngestion', {
         enabled: true,
-        corsOrigins: '',
+        additionalCorsOrigins: '',
         lambdaMemorySize: 10240,
         lambdaTimeout: 900,
         embeddingModel: '   ', // Whitespace only
@@ -626,7 +626,7 @@ describe('RAG Ingestion Configuration', () => {
 
       const config = loadConfig(app);
 
-      expect(config.ragIngestion.corsOrigins).toBe(' http://localhost:3000 , https://example.com ');
+      expect(config.ragIngestion.additionalCorsOrigins).toBe(' http://localhost:3000 , https://example.com ');
     });
   });
 
@@ -639,7 +639,7 @@ describe('RAG Ingestion Configuration', () => {
       // Set context value
       app.node.setContext('ragIngestion', {
         enabled: true,
-        corsOrigins: '',
+        additionalCorsOrigins: '',
         lambdaMemorySize: 8192,
         lambdaTimeout: 900,
         embeddingModel: 'amazon.titan-embed-text-v2',
@@ -658,7 +658,7 @@ describe('RAG Ingestion Configuration', () => {
     test('context overrides default when env not set', () => {
       app.node.setContext('ragIngestion', {
         enabled: true,
-        corsOrigins: '',
+        additionalCorsOrigins: '',
         lambdaMemorySize: 8192,
         lambdaTimeout: 900,
         embeddingModel: 'amazon.titan-embed-text-v2',
@@ -680,7 +680,7 @@ describe('RAG Ingestion Configuration', () => {
     test('mixed precedence for different fields', () => {
       app.node.setContext('ragIngestion', {
         enabled: false,
-        corsOrigins: 'https://context.example.com',
+        additionalCorsOrigins: 'https://context.example.com',
         lambdaMemorySize: 8192,
         lambdaTimeout: 900,
         embeddingModel: 'amazon.titan-embed-text-v2',
@@ -695,7 +695,7 @@ describe('RAG Ingestion Configuration', () => {
       const config = loadConfig(app);
 
       expect(config.ragIngestion.enabled).toBe(true); // env
-      expect(config.ragIngestion.corsOrigins).toBe('https://context.example.com'); // context
+      expect(config.ragIngestion.additionalCorsOrigins).toBe('https://context.example.com'); // context
       expect(config.ragIngestion.lambdaMemorySize).toBe(8192); // context
       expect(config.ragIngestion.lambdaTimeout).toBe(900); // default
     });
@@ -722,7 +722,7 @@ describe('RAG Ingestion Configuration', () => {
     test('handles partial context values', () => {
       app.node.setContext('ragIngestion', {
         enabled: false,
-        corsOrigins: '',
+        additionalCorsOrigins: '',
         lambdaMemorySize: 10240,
         lambdaTimeout: 900,
         embeddingModel: 'amazon.titan-embed-text-v2',

@@ -1,3 +1,200 @@
+# Release Notes — v1.0.0-beta.22
+
+**Release Date:** April 8, 2026
+**Previous Release:** v1.0.0-beta.20 (April 1, 2026)
+
+---
+
+## Highlights
+
+This release replaces the authentication system end-to-end with a **Cognito-native identity broker** and zero-configuration first-boot experience. The previous generic OIDC flow, backend token exchange, and manual auth provider seeding are gone entirely. Alongside the auth migration, **CORS handling is unified** across all six CDK stacks via a shared `buildCorsOrigins` helper, the **RBAC authorization layer is consolidated** to a single `require_app_roles` dependency with role enrichment from stored user profiles, and a **documentation cleanup** purges 54,000+ lines of outdated specs and AI-generated artifacts.
+
+---
+
+## ⚠️ Breaking Change — Cognito Authentication Migration
+
+**This is a breaking change release.** The entire authentication system has been replaced with AWS Cognito as the sole identity broker. The previous generic OIDC implementation — including the backend token exchange service, OIDC discovery endpoint, PKCE flow, and multi-provider auth bootstrapping — has been removed. There is no backward compatibility layer and no migration path that preserves the old auth flow. The legacy implementation is not supported going forward.
+
+**If you are upgrading an existing deployment**, you must:
+
+1. Deploy the Infrastructure stack first to provision the new Cognito User Pool, App Client, and Domain
+2. Reconfigure any federated identity providers (e.g., Entra ID, Okta) as Cognito federated IdPs — the old auth provider table format is not compatible
+3. Re-bootstrap your admin user via the new first-boot flow (the first user to access the app after upgrade creates the admin account)
+4. Update all CI/CD workflows with `CDK_DOMAIN_NAME` and `CDK_CORS_ORIGINS` environment variables
+
+**If you are deploying fresh**, the new first-boot experience handles everything automatically — no manual seeding or Secrets Manager configuration required.
+
+---
+
+## Cognito First-Boot Authentication
+
+The entire authentication architecture has been rearchitected around AWS Cognito as the native identity provider. The previous generic OIDC flow — including manual auth provider seeding, Secrets Manager client secret configuration, and the multi-step bootstrap process — has been removed with no backward compatibility.
+
+### First-Boot Experience
+
+On initial deployment, the first user to access the application is presented with a setup page to create the admin account directly in Cognito. This eliminates the previous multi-step bootstrap process (seed auth provider secrets, configure OIDC endpoints, create initial user). The first-boot flow uses race-condition-safe DynamoDB writes to ensure only one admin account is created.
+
+### Infrastructure
+
+A Cognito User Pool, App Client, and Domain are now provisioned in the Infrastructure CDK stack. SSM parameters wire the Cognito configuration across stacks. The AgentCore Runtime is configured with a single Cognito JWT authorizer, replacing the previous generic OIDC validator.
+
+### Backend
+
+- New `CognitoJWTValidator` replaces `GenericOIDCJWTValidator` with Cognito-specific JWKS validation and claim extraction
+- New `system/` module (`cognito_service.py`, `repository.py`, `routes.py`, `models.py`) handles first-boot setup, system status, and Cognito user/group management
+- New `cognito_idp_service.py` in `shared/auth_providers/` manages federated identity provider CRUD via Cognito IdP APIs
+- `add_user_to_group` method manages Cognito group membership with rollback on failure
+- Bootstrap script (`seed_bootstrap_data.py`) simplified — no longer seeds auth provider secrets, focuses on RBAC roles and JWT mappings
+- Runtime-provisioner and runtime-updater Lambda functions removed entirely (2,800+ lines deleted)
+
+### Frontend
+
+- New first-boot page (`first-boot.page.ts`) with admin account creation form and `first-boot.guard.ts` route guard
+- Login page simplified — delegates to Cognito OAuth 2.0 + PKCE flow instead of managing tokens directly
+- `auth-api.service.ts` removed — frontend communicates directly with Cognito
+- `callback.service.ts` rewritten for Cognito token exchange
+- Auth provider form now displays the required Cognito redirect URI (`{cognitoDomainUrl}/oauth2/idpresponse`) with a copy button for zero-friction IdP registration
+- Provider list page simplified — runtime status UI and unused icon imports removed
+- Updated favicon and logo assets with refreshed branding and cross-platform icon support
+
+### Test Coverage
+
+1,177 lines of new `CognitoIdPService` tests, 316 lines of `CognitoJWTValidator` tests, 286 lines of first-boot tests, 278 lines of system service tests, plus updated auth route, dependency, RBAC, and auth sweep tests. Frontend gains `SystemService` unit tests and updated auth guard/callback/interceptor specs.
+
+---
+
+## Cognito-Managed Auth Flow Migration
+
+The backend OIDC authentication service and token exchange layer have been removed entirely with no compatibility shim. The frontend now communicates directly with Cognito for all auth operations. The legacy OIDC implementation is not supported and will not be restored.
+
+### Removed
+
+- Backend `auth/models.py`, `auth/service.py`, and associated test files (`test_oidc_auth_service.py`, `test_pkce.py`)
+- Token refresh and logout endpoints from backend auth routes
+- OIDC discovery endpoint (`POST /discover`) from admin auth provider routes
+- 1,318 lines of backend auth code deleted
+
+### Simplified
+
+- Auth routes reduced to a single public provider listing endpoint
+- User service updated to work with Cognito-provided user information
+- Auth provider repository gains JSON parsing error handling for malformed Secrets Manager values
+
+---
+
+## RBAC Authorization Consolidation
+
+The authorization system has been consolidated from multiple role-checking functions to a single `require_app_roles` dependency that resolves permissions through `AppRoleService`.
+
+### Removed
+
+- `require_roles`, `require_all_roles`, `has_any_role`, `has_all_roles`
+- Role-specific decorators: `require_faculty`, `require_staff`, `require_developer`, `require_aws_ai_access`
+- Auth module exports simplified to only `require_app_roles` and `require_admin`
+
+### Added
+
+- User roles enriched from stored DynamoDB profile during token processing, ensuring RBAC uses correct IdP-mapped roles instead of Cognito provider group names
+- User profile cache invalidation on `sync_my_profile` — subsequent requests pick up fresh roles immediately instead of waiting for the 5-minute cache TTL
+- JSON array parsing for `custom:roles` claim (`CognitoJWTValidator`) — supports both `'["Admin","Staff"]'` and comma-separated formats for Entra ID role mapping
+- `parseRolesFromToken` utility function on the frontend with 118 lines of test coverage
+- `jwt_role_mappings` updates now allowed on `system_admin` role — validation changed from error-raising to silent field filtering with logging
+- Role priority maximum increased from 999 to 1000
+
+---
+
+## CORS Unification
+
+All six CDK stacks now use a single shared `buildCorsOrigins()` helper in `config.ts` that builds CORS origins from `CDK_DOMAIN_NAME` (always), `localhost:4200` (always, for local dev), and optional per-section `additionalCorsOrigins`. This replaces the previous per-stack `corsOrigins` fields that were inconsistent and error-prone.
+
+### Changes
+
+- S3 CORS configuration made conditional — `undefined` when no origins are configured, preventing empty CORS rules
+- RAG CORS Lambda fix: `ExposedHeaders` corrected to `ExposeHeaders` (the valid boto3 S3 CORS parameter name), fixing CloudFormation custom resource failures during frontend stack deployment
+- Both Python APIs (`app_api`, `inference_api`) read `CORS_ORIGINS` env var, replacing hardcoded `allow_origins=['*']` with an env-driven allowlist
+- Regression tests added for CORS_ORIGINS in app-api and inference-api stack tests
+
+---
+
+## Bootstrap & Seeding Fixes
+
+- Bootstrap script (`seed_bootstrap_data.py`) is now the sole owner of RBAC role seeding — `ensure_system_roles()` removed from app-api startup to prevent overwriting admin customizations on every boot
+- `system_admin` role seeded with `jwt_role_mappings=['system_admin']` instead of empty array — fixes the issue where Cognito first-boot admin users had the right `cognito:groups` claim but no matching AppRole
+- Additive JWT mapping seeding: if the role exists but is missing required mappings, they're added without removing existing custom mappings
+
+---
+
+## CI/CD Improvements
+
+- `CDK_DOMAIN_NAME` and `CDK_CORS_ORIGINS` added to all workflow jobs that run synth or deploy (previously missing from `inference-api.yml` and `gateway.yml`, causing `loadConfig` validation failures)
+- `CDK_CORS_ORIGINS` and `CDK_FILE_UPLOAD_CORS_ORIGINS` added to nightly deploy pipeline
+- SSM `StringParameter` creation guarded with conditional check to prevent empty string values (SSM parameter tier rejects empty strings)
+- File upload CORS validation softened from hard error to warning since `loadConfig` runs for all stacks
+- Infrastructure workflow updated with Cognito context values
+- Trivy image scanning action upgraded from `v0.28.0` to `v0.35.0` with corrected SHA pin — the previous pin (`18f2510`) was actually the `v0.29.0` commit SHA mislabeled as `v0.28.0`, and was among the tags compromised in the [March 2026 trivy-action supply chain attack](https://github.com/aquasecurity/trivy/security/advisories/GHSA-69fq-xp46-6x23). The new pin (`57a97c7e`) points to the post-remediation immutable `v0.35.0` release
+- App API `synth-cdk` job now actually skipped on pull requests — the `if: github.event_name != 'pull_request'` guard was missing despite being documented in beta.20. PRs no longer require AWS credentials or ARM runners for the app-api workflow
+
+---
+
+## Bug Fixes
+
+- Model form validation summary now displayed above submit button showing all invalid fields — fixes the greyed-out submit button with no visible errors on edit
+- "Add Model" button and "Browse Bedrock/Gemini/OpenAI Models" links uncommented on manage models page
+- `SystemService` tests stabilized against shared fetch spy by filtering assertions by URL
+- Inference API endpoints updated with `/invocations` path and URL-encoded ARN to prevent parsing errors with AgentCore runtime ARNs
+- ALB listener rule updated with `requestHeaderConfiguration` to propagate `Authorization` header to inference API
+- AWS Marketplace permissions (`ViewSubscriptions`, `Subscribe`) added to runtime execution role for marketplace-gated Bedrock models
+
+---
+
+## Documentation Cleanup
+
+54,665 lines of outdated AI specs, feature summaries, and documentation purged across 121 files. Removed content includes completed spec directories (agent-core-tests, api-route-tests, auth-rbac-tests, bootstrap-data-seeding, config-cleanup-audit, environment-agnostic-refactor, and 12 others), duplicate docs under `docs/specs/`, the `GEMINI.md` agent config, `codeql-alerts.json` dump, and the `CODE_REVIEW_TOKEN_STORAGE.md` document. The Cognito first-boot auth and reliable document deletion specs were added as replacements.
+
+---
+
+## Dependency Upgrades
+
+| Component | From | To |
+|---|---|---|
+| Angular packages | 21.2.6 | 21.2.7 |
+| @angular/cdk | 21.2.4 | 21.2.5 |
+| @angular/build | 21.2.5 | 21.2.6 |
+| @angular/cli | 21.2.5 | 21.2.6 |
+| katex | 0.16.44 | 0.16.45 |
+| marked | 17.0.5 | 17.0.6 |
+| mermaid | 11.13.0 | 11.14.0 |
+| @analogjs/vite-plugin-angular | 3.0.0-alpha.18 | 3.0.0-alpha.26 |
+| @analogjs/vitest-angular | 3.0.0-alpha.18 | 3.0.0-alpha.26 |
+| aws-cdk-lib | 2.245.0 | 2.248.0 |
+| aws-cdk (CLI) | 2.1115.0 | 2.1117.0 |
+| @types/node | 25.5.0 | 25.5.2 |
+| ts-jest | 29.4.6 | 29.4.9 |
+| fastapi | 0.135.2 | 0.135.3 |
+| uvicorn | 0.42.0 | 0.44.0 |
+| boto3 | 1.42.78 | 1.42.83 |
+| strands-agents | 1.33.0 | 1.34.1 |
+| bedrock-agentcore | 1.4.8 | 1.6.0 |
+| google-genai | 1.69.0 | 1.70.0 |
+| hypothesis | 6.151.10 | 6.151.11 |
+| ruff | 0.15.8 | 0.15.9 |
+| mypy | 1.19.1 | 1.20.0 |
+
+---
+
+## Deployment Notes
+
+**This release contains breaking changes.** See the migration steps at the top of this document.
+
+- **Infrastructure:** Deploy first. The stack now provisions a Cognito User Pool, App Client, and Domain. New CDK context values required: `CDK_DOMAIN_NAME` and `CDK_CORS_ORIGINS` must be set in all workflow environments.
+- **Backend:** The App API no longer handles token exchange or OIDC discovery. The `GenericOIDCJWTValidator`, `auth/service.py`, `auth/models.py`, and all token management endpoints have been deleted. The `runtime-provisioner` and `runtime-updater` Lambda functions have been removed. Restart all containers.
+- **Frontend:** Full rebuild and deploy required. The auth flow now uses Cognito OAuth 2.0 + PKCE directly. The `auth-api.service.ts` has been removed. The first user to access a fresh deployment will see the first-boot setup page.
+- **Federated IdPs:** Existing Entra ID, Okta, or other OIDC providers must be reconfigured as Cognito federated identity providers. The old auth provider table format and Secrets Manager secret structure are no longer used. Register the Cognito redirect URI (`{cognitoDomainUrl}/oauth2/idpresponse`) in your external IdP.
+- **Bootstrap:** The seed script no longer seeds auth provider secrets or OIDC configuration. It only handles RBAC roles and JWT mappings.
+- **Nightly/CI:** All workflows now require `CDK_DOMAIN_NAME` and `CDK_CORS_ORIGINS` environment variables.
+
+---
+
 # Release Notes — v1.0.0-beta.20
 
 **Release Date:** April 1, 2026

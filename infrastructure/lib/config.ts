@@ -1,5 +1,12 @@
 import * as cdk from 'aws-cdk-lib';
 
+export interface CognitoConfig {
+  domainPrefix?: string;       // Custom Cognito domain prefix (defaults to projectPrefix)
+  callbackUrls?: string[];     // Additional callback URLs beyond auto-derived
+  logoutUrls?: string[];       // Additional logout URLs beyond auto-derived
+  passwordMinLength?: number;  // Override default 8
+}
+
 export interface AppConfig {
   projectPrefix: string;
   awsAccount: string;
@@ -12,6 +19,7 @@ export interface AppConfig {
   infrastructureHostedZoneDomain?: string;
   albSubdomain?: string; // Subdomain for ALB (e.g., 'api' for api.yourdomain.com)
   certificateArn?: string; // ACM certificate ARN for HTTPS on ALB
+  cognito: CognitoConfig;
   frontend: FrontendConfig;
   appApi: AppApiConfig;
   inferenceApi: InferenceApiConfig;
@@ -29,11 +37,12 @@ export interface FrontendConfig {
   enabled: boolean;
   bucketName?: string;
   cloudFrontPriceClass: string;
+  additionalCorsOrigins?: string; // Extra CORS origins to append (comma-separated)
 }
 
 export interface AssistantsConfig {
   enabled: boolean;
-  corsOrigins: string;
+  additionalCorsOrigins?: string; // Extra CORS origins to append (comma-separated)
 }
 
 export interface AppApiConfig {
@@ -43,6 +52,7 @@ export interface AppApiConfig {
   desiredCount: number;
   maxCapacity: number;
   imageTag: string;
+  additionalCorsOrigins?: string; // Extra CORS origins to append (comma-separated)
 }
 
 export interface InferenceApiConfig {
@@ -54,7 +64,7 @@ export interface InferenceApiConfig {
   imageTag: string;
   // Environment variables for runtime container
   logLevel: string;
-  corsOrigins: string;
+  additionalCorsOrigins?: string; // Extra CORS origins to append (comma-separated)
 }
 
 export interface GatewayConfig {
@@ -72,12 +82,12 @@ export interface FileUploadConfig {
   maxFilesPerMessage: number;    // Maximum files per message (default: 5)
   userQuotaBytes: number;        // Per-user storage quota (default: 1GB)
   retentionDays: number;         // File retention (default: 365 days)
-  corsOrigins?: string;          // Comma-separated CORS origins (defaults based on environment)
+  additionalCorsOrigins?: string; // Extra CORS origins to append (comma-separated)
 }
 
 export interface RagIngestionConfig {
   enabled: boolean;              // Enable/disable RAG stack
-  corsOrigins: string;           // Comma-separated CORS origins
+  additionalCorsOrigins?: string; // Extra CORS origins to append (comma-separated)
   lambdaMemorySize: number;      // Lambda memory in MB (default: 3008)
   lambdaTimeout: number;         // Lambda timeout in seconds (default: 900)
   embeddingModel: string;        // Bedrock model ID (default: "amazon.titan-embed-text-v2")
@@ -88,6 +98,7 @@ export interface RagIngestionConfig {
 export interface FineTuningConfig {
   enabled: boolean;              // Enable/disable SageMaker Fine-Tuning stack
   defaultQuotaHours: number;     // Default monthly GPU-hour quota for all users (0 = whitelist-only)
+  additionalCorsOrigins?: string; // Extra CORS origins to append (comma-separated)
 }
 
 /**
@@ -135,12 +146,21 @@ export function loadConfig(scope: cdk.App): AppConfig {
   validateAwsAccount(awsAccount);
   validateAwsRegion(awsRegion);
 
-  // Top-level shared CORS origins — used as default for sections that don't override.
-  // If not explicitly set, auto-derive from CDK_DOMAIN_NAME so callers only need one variable.
+  // Top-level shared CORS origins — always includes https://{domainName} when set.
+  // CDK_CORS_ORIGINS provides ADDITIONAL origins on top of the domain.
   const domainName = process.env.CDK_DOMAIN_NAME || scope.node.tryGetContext('domainName');
-  const corsOrigins = process.env.CDK_CORS_ORIGINS
+  const extraCorsOrigins = process.env.CDK_CORS_ORIGINS
     || scope.node.tryGetContext('corsOrigins')
-    || (domainName ? `https://${domainName}` : '');
+    || '';
+  // Build corsOrigins: domain-derived origin first, then any extras
+  const corsOriginParts: string[] = [];
+  if (domainName) {
+    corsOriginParts.push(`https://${domainName}`);
+  }
+  if (extraCorsOrigins) {
+    corsOriginParts.push(extraCorsOrigins);
+  }
+  const corsOrigins = corsOriginParts.join(',');
 
   // Load app version from environment variable or CDK context
   const appVersion = process.env.CDK_APP_VERSION || scope.node.tryGetContext('appVersion') || 'unknown';
@@ -158,11 +178,24 @@ export function loadConfig(scope: cdk.App): AppConfig {
     infrastructureHostedZoneDomain: process.env.CDK_HOSTED_ZONE_DOMAIN || scope.node.tryGetContext('infrastructureHostedZoneDomain'),
     albSubdomain: process.env.CDK_ALB_SUBDOMAIN || scope.node.tryGetContext('albSubdomain'),
     certificateArn: process.env.CDK_CERTIFICATE_ARN || scope.node.tryGetContext('certificateArn'),
+    cognito: {
+      domainPrefix: process.env.CDK_COGNITO_DOMAIN_PREFIX
+        || scope.node.tryGetContext('cognito')?.domainPrefix
+        || projectPrefix,
+      callbackUrls: process.env.CDK_COGNITO_CALLBACK_URLS?.split(',')
+        || scope.node.tryGetContext('cognito')?.callbackUrls,
+      logoutUrls: process.env.CDK_COGNITO_LOGOUT_URLS?.split(',')
+        || scope.node.tryGetContext('cognito')?.logoutUrls,
+      passwordMinLength: parseIntEnv(process.env.CDK_COGNITO_PASSWORD_MIN_LENGTH)
+        || scope.node.tryGetContext('cognito')?.passwordMinLength
+        || 8,
+    },
     frontend: {
       certificateArn: process.env.CDK_FRONTEND_CERTIFICATE_ARN || scope.node.tryGetContext('frontend').certificateArn,
       enabled: parseBooleanEnv(process.env.CDK_FRONTEND_ENABLED) ?? scope.node.tryGetContext('frontend')?.enabled,
       bucketName: process.env.CDK_FRONTEND_BUCKET_NAME || scope.node.tryGetContext('frontend')?.bucketName,
       cloudFrontPriceClass: process.env.CDK_FRONTEND_CLOUDFRONT_PRICE_CLASS || scope.node.tryGetContext('frontend')?.cloudFrontPriceClass,
+      additionalCorsOrigins: process.env.CDK_FRONTEND_CORS_ORIGINS || scope.node.tryGetContext('frontend')?.additionalCorsOrigins,
     },
     appApi: {
       enabled: parseBooleanEnv(process.env.CDK_APP_API_ENABLED) ?? scope.node.tryGetContext('appApi')?.enabled,
@@ -171,6 +204,7 @@ export function loadConfig(scope: cdk.App): AppConfig {
       desiredCount: parseIntEnv(process.env.CDK_APP_API_DESIRED_COUNT) ?? scope.node.tryGetContext('appApi')?.desiredCount,
       imageTag: scope.node.tryGetContext('imageTag') || '',
       maxCapacity: parseIntEnv(process.env.CDK_APP_API_MAX_CAPACITY) || scope.node.tryGetContext('appApi')?.maxCapacity,
+      additionalCorsOrigins: process.env.CDK_APP_API_CORS_ORIGINS || scope.node.tryGetContext('appApi')?.additionalCorsOrigins,
     },
     inferenceApi: {
       enabled: parseBooleanEnv(process.env.CDK_INFERENCE_API_ENABLED) ?? scope.node.tryGetContext('inferenceApi')?.enabled,
@@ -181,7 +215,7 @@ export function loadConfig(scope: cdk.App): AppConfig {
       imageTag: scope.node.tryGetContext('imageTag') || '',
       // Environment variables from GitHub Secrets/Variables with context fallback
       logLevel: process.env.ENV_INFERENCE_API_LOG_LEVEL || scope.node.tryGetContext('inferenceApi')?.logLevel,
-      corsOrigins: process.env.ENV_INFERENCE_API_CORS_ORIGINS || scope.node.tryGetContext('inferenceApi')?.corsOrigins,
+      additionalCorsOrigins: process.env.CDK_INFERENCE_API_CORS_ORIGINS || scope.node.tryGetContext('inferenceApi')?.additionalCorsOrigins,
     },
     gateway: {
       enabled: parseBooleanEnv(process.env.CDK_GATEWAY_ENABLED) ?? scope.node.tryGetContext('gateway')?.enabled,
@@ -197,15 +231,15 @@ export function loadConfig(scope: cdk.App): AppConfig {
       maxFilesPerMessage: parseIntEnv(process.env.CDK_FILE_UPLOAD_MAX_FILES_PER_MESSAGE) || scope.node.tryGetContext('fileUpload')?.maxFilesPerMessage,
       userQuotaBytes: parseIntEnv(process.env.CDK_FILE_UPLOAD_USER_QUOTA) || scope.node.tryGetContext('fileUpload')?.userQuotaBytes,
       retentionDays: parseIntEnv(process.env.CDK_FILE_UPLOAD_RETENTION_DAYS) || scope.node.tryGetContext('fileUpload')?.retentionDays,
-      corsOrigins: process.env.CDK_FILE_UPLOAD_CORS_ORIGINS || scope.node.tryGetContext('fileUpload')?.corsOrigins || corsOrigins,
+      additionalCorsOrigins: process.env.CDK_FILE_UPLOAD_CORS_ORIGINS || scope.node.tryGetContext('fileUpload')?.additionalCorsOrigins,
     },
     assistants: {
       enabled: parseBooleanEnv(process.env.CDK_ASSISTANTS_ENABLED) ?? scope.node.tryGetContext('assistants')?.enabled,
-      corsOrigins: process.env.CDK_ASSISTANTS_CORS_ORIGINS || scope.node.tryGetContext('assistants')?.corsOrigins || corsOrigins,
+      additionalCorsOrigins: process.env.CDK_ASSISTANTS_CORS_ORIGINS || scope.node.tryGetContext('assistants')?.additionalCorsOrigins,
     },
     ragIngestion: {
       enabled: parseBooleanEnv(process.env.CDK_RAG_ENABLED) ?? scope.node.tryGetContext('ragIngestion')?.enabled,
-      corsOrigins: process.env.CDK_RAG_CORS_ORIGINS || scope.node.tryGetContext('ragIngestion')?.corsOrigins || corsOrigins,
+      additionalCorsOrigins: process.env.CDK_RAG_CORS_ORIGINS || scope.node.tryGetContext('ragIngestion')?.additionalCorsOrigins,
       lambdaMemorySize: parseIntEnv(process.env.CDK_RAG_LAMBDA_MEMORY) || scope.node.tryGetContext('ragIngestion')?.lambdaMemorySize,
       lambdaTimeout: parseIntEnv(process.env.CDK_RAG_LAMBDA_TIMEOUT) || scope.node.tryGetContext('ragIngestion')?.lambdaTimeout,
       embeddingModel: process.env.CDK_RAG_EMBEDDING_MODEL || scope.node.tryGetContext('ragIngestion')?.embeddingModel,
@@ -215,6 +249,7 @@ export function loadConfig(scope: cdk.App): AppConfig {
     fineTuning: {
       enabled: parseBooleanEnv(process.env.CDK_FINE_TUNING_ENABLED) ?? scope.node.tryGetContext('fineTuning')?.enabled ?? false,
       defaultQuotaHours: parseIntEnv(process.env.CDK_FINE_TUNING_DEFAULT_QUOTA_HOURS) ?? scope.node.tryGetContext('fineTuning')?.defaultQuotaHours ?? 0,
+      additionalCorsOrigins: process.env.CDK_FINE_TUNING_CORS_ORIGINS || scope.node.tryGetContext('fineTuning')?.additionalCorsOrigins,
     },
     tags: {
       ...(scope.node.tryGetContext('tags') || {}),
@@ -389,11 +424,11 @@ function validateConfig(config: AppConfig): void {
     }
 
     // Validate CORS origins if provided
-    if (config.ragIngestion.corsOrigins) {
-      const origins = config.ragIngestion.corsOrigins.split(',').map(o => o.trim());
+    if (config.corsOrigins) {
+      const origins = config.corsOrigins.split(',').map(o => o.trim());
       origins.forEach(origin => {
         if (origin && !origin.startsWith('http://') && !origin.startsWith('https://') && origin !== '*') {
-          console.warn(`Warning: RAG CORS origin '${origin}' should start with http:// or https:// or be '*'`);
+          console.warn(`Warning: CORS origin '${origin}' should start with http:// or https:// or be '*'`);
         }
       });
     }
@@ -410,14 +445,11 @@ function validateConfig(config: AppConfig): void {
   }
 
   // Validate File Upload CORS origins
-  if (config.fileUpload.enabled) {
-    const effectiveCors = config.fileUpload.corsOrigins || config.corsOrigins || config.domainName;
-    if (!effectiveCors || effectiveCors.trim() === '') {
-      throw new Error(
-        'File Upload stack requires CORS origins to be configured. ' +
-        'Set CDK_DOMAIN_NAME, CDK_CORS_ORIGINS, or corsOrigins in the fileUpload section.'
-      );
-    }
+  if (config.fileUpload.enabled && !config.corsOrigins) {
+    console.warn(
+      'Warning: File Upload is enabled but no CORS origins configured. ' +
+      'Set CDK_DOMAIN_NAME or CDK_CORS_ORIGINS to enable browser uploads.'
+    );
   }
 
   // Validate required fields for all enabled stacks
@@ -539,4 +571,33 @@ export function applyStandardTags(stack: cdk.Stack, config: AppConfig): void {
   Object.entries(config.tags).forEach(([key, value]) => {
     cdk.Tags.of(stack).add(key, value);
   });
+}
+
+/**
+ * Build the canonical CORS origins list for a stack.
+ *
+ * Always includes:
+ *   1. https://{CDK_DOMAIN_NAME}  (from config.corsOrigins)
+ *
+ * Optionally appends extra origins from:
+ *   - CDK_CORS_ORIGINS (already merged into config.corsOrigins)
+ *   - additionalOrigins parameter (section-specific CDK_*_CORS_ORIGINS)
+ *
+ * localhost is NOT auto-included. Add it via CDK_CORS_ORIGINS for local dev.
+ *
+ * Returns a de-duplicated array suitable for S3 CORS rules or
+ * a comma-joined string for container env vars.
+ *
+ * @param config  The top-level AppConfig
+ * @param additionalOrigins  Optional comma-separated extra origins to append
+ */
+export function buildCorsOrigins(config: AppConfig, additionalOrigins?: string): string[] {
+  const origins = new Set<string>();
+  if (config.corsOrigins) {
+    config.corsOrigins.split(',').map(o => o.trim()).filter(Boolean).forEach(o => origins.add(o));
+  }
+  if (additionalOrigins) {
+    additionalOrigins.split(',').map(o => o.trim()).filter(Boolean).forEach(o => origins.add(o));
+  }
+  return Array.from(origins);
 }

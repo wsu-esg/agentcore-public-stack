@@ -1,5 +1,6 @@
 import * as cdk from 'aws-cdk-lib';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
+import * as cognito from 'aws-cdk-lib/aws-cognito';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
@@ -11,7 +12,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import { Construct } from 'constructs';
-import { AppConfig, getResourceName, applyStandardTags, getRemovalPolicy, getAutoDeleteObjects } from './config';
+import { AppConfig, getResourceName, applyStandardTags, getRemovalPolicy, getAutoDeleteObjects, buildCorsOrigins } from './config';
 
 export interface InfrastructureStackProps extends cdk.StackProps {
   config: AppConfig;
@@ -1073,6 +1074,118 @@ export class InfrastructureStack extends cdk.Stack {
     });
 
     // ============================================================
+    // Cognito User Pool (Identity Broker)
+    // ============================================================
+    // Central identity broker for all authentication. Federates to
+    // external IdPs (Entra ID, Okta, Google) and issues its own JWTs.
+    // Self-signup is enabled initially for first-boot; the App API
+    // disables it after the first admin user is created.
+
+    const userPool = new cognito.UserPool(this, 'CognitoUserPool', {
+      userPoolName: getResourceName(config, 'user-pool'),
+      selfSignUpEnabled: true,
+      signInAliases: { username: true, email: true },
+      autoVerify: { email: true },
+      standardAttributes: {
+        email: { required: true, mutable: true },
+        givenName: { mutable: true },
+        familyName: { mutable: true },
+      },
+      customAttributes: {
+        'provider_sub': new cognito.StringAttribute({ mutable: true }),
+        'roles': new cognito.StringAttribute({ mutable: true }),
+      },
+      passwordPolicy: {
+        minLength: config.cognito.passwordMinLength || 8,
+        requireUppercase: true,
+        requireLowercase: true,
+        requireDigits: true,
+        requireSymbols: true,
+      },
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
+      removalPolicy: getRemovalPolicy(config),
+    });
+
+    // App Client — SPA, no client secret, authorization code grant with PKCE
+    const callbackUrls = config.domainName
+      ? [`https://${config.domainName}/auth/callback`]
+      : ['http://localhost:4200/auth/callback'];
+    const logoutUrls = config.domainName
+      ? [`https://${config.domainName}`]
+      : ['http://localhost:4200'];
+
+    // Append any additional callback/logout URLs from config
+    if (config.cognito.callbackUrls) {
+      callbackUrls.push(...config.cognito.callbackUrls);
+    }
+    if (config.cognito.logoutUrls) {
+      logoutUrls.push(...config.cognito.logoutUrls);
+    }
+
+    const appClient = userPool.addClient('CognitoAppClient', {
+      userPoolClientName: getResourceName(config, 'app-client'),
+      generateSecret: false,
+      authFlows: { userSrp: true, custom: true },
+      oAuth: {
+        flows: { authorizationCodeGrant: true },
+        scopes: [
+          cognito.OAuthScope.OPENID,
+          cognito.OAuthScope.PROFILE,
+          cognito.OAuthScope.EMAIL,
+        ],
+        callbackUrls,
+        logoutUrls,
+      },
+      preventUserExistenceErrors: true,
+      supportedIdentityProviders: [
+        cognito.UserPoolClientIdentityProvider.COGNITO,
+      ],
+    });
+
+    // Cognito Domain — prefix-based using project prefix or override
+    const cognitoDomain = userPool.addDomain('CognitoDomain', {
+      cognitoDomain: {
+        domainPrefix: config.cognito.domainPrefix || config.projectPrefix,
+      },
+    });
+
+    // Cognito SSM Exports
+    new ssm.StringParameter(this, 'CognitoUserPoolIdParameter', {
+      parameterName: `/${config.projectPrefix}/auth/cognito/user-pool-id`,
+      stringValue: userPool.userPoolId,
+      description: 'Cognito User Pool ID',
+      tier: ssm.ParameterTier.STANDARD,
+    });
+
+    new ssm.StringParameter(this, 'CognitoUserPoolArnParameter', {
+      parameterName: `/${config.projectPrefix}/auth/cognito/user-pool-arn`,
+      stringValue: userPool.userPoolArn,
+      description: 'Cognito User Pool ARN',
+      tier: ssm.ParameterTier.STANDARD,
+    });
+
+    new ssm.StringParameter(this, 'CognitoAppClientIdParameter', {
+      parameterName: `/${config.projectPrefix}/auth/cognito/app-client-id`,
+      stringValue: appClient.userPoolClientId,
+      description: 'Cognito App Client ID',
+      tier: ssm.ParameterTier.STANDARD,
+    });
+
+    new ssm.StringParameter(this, 'CognitoDomainUrlParameter', {
+      parameterName: `/${config.projectPrefix}/auth/cognito/domain-url`,
+      stringValue: cognitoDomain.baseUrl(),
+      description: 'Cognito hosted UI domain URL',
+      tier: ssm.ParameterTier.STANDARD,
+    });
+
+    new ssm.StringParameter(this, 'CognitoIssuerUrlParameter', {
+      parameterName: `/${config.projectPrefix}/auth/cognito/issuer-url`,
+      stringValue: `https://cognito-idp.${config.awsRegion}.amazonaws.com/${userPool.userPoolId}`,
+      description: 'Cognito OIDC issuer URL',
+      tier: ssm.ParameterTier.STANDARD,
+    });
+
+    // ============================================================
     // File Upload Storage (S3 + DynamoDB)
     // ============================================================
     // These resources are shared by both App API (uploads) and Inference API
@@ -1080,17 +1193,7 @@ export class InfrastructureStack extends cdk.Stack {
     // dependency: InferenceApiStack (tier 2) deploys before AppApiStack (tier 3).
 
     // Build CORS origins for file upload bucket
-    const fileUploadCorsOrigins: string[] = (() => {
-      const origins = new Set<string>();
-      origins.add('http://localhost:4200');
-      if (config.domainName) {
-        origins.add(`https://${config.domainName}`);
-      }
-      if (config.fileUpload?.corsOrigins) {
-        config.fileUpload.corsOrigins.split(',').map(o => o.trim()).filter(Boolean).forEach(o => origins.add(o));
-      }
-      return Array.from(origins);
-    })();
+    const fileUploadCorsOrigins = buildCorsOrigins(config, config.fileUpload?.additionalCorsOrigins);
 
     // S3 Bucket for user file uploads
     const userFilesBucket = new s3.Bucket(this, "UserFilesBucket", {
@@ -1101,7 +1204,7 @@ export class InfrastructureStack extends cdk.Stack {
       versioned: false,
       removalPolicy: getRemovalPolicy(config),
       autoDeleteObjects: getAutoDeleteObjects(config),
-      cors: [
+      cors: fileUploadCorsOrigins.length > 0 ? [
         {
           allowedOrigins: fileUploadCorsOrigins,
           allowedMethods: [s3.HttpMethods.GET, s3.HttpMethods.PUT, s3.HttpMethods.HEAD],
@@ -1109,7 +1212,7 @@ export class InfrastructureStack extends cdk.Stack {
           exposedHeaders: ["ETag", "Content-Length", "Content-Type"],
           maxAge: 3600,
         },
-      ],
+      ] : undefined,
       lifecycleRules: [
         {
           id: "transition-to-ia",

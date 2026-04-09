@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { AuthService } from './auth.service';
 import { ConfigService } from '../services/config.service';
 import { User, JWTPayload, UserPermissions } from './user.model';
+import { parseRolesFromToken } from './parse-roles';
 
 /**
  * Service for managing current user information decoded from JWT tokens.
@@ -38,12 +39,13 @@ export class UserService {
     // If user has a token on page load, fetch permissions from backend
     if (this.authService.getAccessToken()) {
       this._permissionsPromise = this.fetchPermissions();
+      this.syncProfileToBackend();
     }
 
     if (typeof window !== 'undefined') {
       // Listen for storage events to sync when tokens change in other tabs/windows
       window.addEventListener('storage', (event) => {
-        if (event.key === 'access_token' || event.key === null) {
+        if (event.key === 'access_token' || event.key === 'id_token' || event.key === null) {
           this.refreshUser();
         }
       });
@@ -52,6 +54,7 @@ export class UserService {
       window.addEventListener('token-stored', () => {
         this.refreshUser();
         this._permissionsPromise = this.fetchPermissions();
+        this.syncProfileToBackend();
       });
 
       window.addEventListener('token-cleared', () => {
@@ -103,8 +106,10 @@ export class UserService {
       }
 
       // Build full name from available claims
+      // ID tokens have name/given_name/family_name; Cognito tokens have cognito:username
       const fullName = jwtPayload.name ||
         `${jwtPayload.given_name || ''} ${jwtPayload.family_name || ''}`.trim() ||
+        jwtPayload['cognito:username'] ||
         email;
 
       // Extract first and last name - prefer JWT claims, fall back to parsing fullName
@@ -118,7 +123,11 @@ export class UserService {
         lastName = nameParts.slice(1).join(' ') || '';
       }
 
-      const roles = jwtPayload.roles || [];
+      // Extract roles using shared parser (handles JSON arrays, comma-separated, fallbacks)
+      const roles = parseRolesFromToken(jwtPayload);
+
+      // Extract IdP user identifier (mapped via custom:provider_sub)
+      const providerSub = jwtPayload['custom:provider_sub'] || '';
 
       const user: User = {
         email,
@@ -127,7 +136,8 @@ export class UserService {
         lastName,
         fullName,
         roles,
-        picture: jwtPayload.picture
+        picture: jwtPayload.picture,
+        providerSub,
       };
 
       return user;
@@ -209,6 +219,32 @@ export class UserService {
   }
 
   /**
+   * Sync user profile from the ID token to the backend Users table.
+   * Called after each login/token refresh so the backend has current
+   * identity data (email, name, picture) that isn't in the access token.
+   */
+  private async syncProfileToBackend(): Promise<void> {
+    const user = this.currentUser();
+    if (!user?.email) return;
+
+    try {
+      const url = `${this.config.appApiUrl()}/users/me/sync`;
+      await firstValueFrom(
+        this.http.post(url, {
+          email: user.email,
+          name: user.fullName,
+          picture: user.picture || null,
+          roles: user.roles || [],
+          provider_sub: user.providerSub || null,
+        })
+      );
+    } catch (error) {
+      // Non-critical — don't break the login flow
+      console.warn('Failed to sync profile to backend:', error);
+    }
+  }
+
+  /**
    * Ensure permissions have been loaded. Awaits any in-flight fetch
    * or starts a new one if needed. Used by guards to handle direct navigation.
    */
@@ -231,10 +267,13 @@ export class UserService {
 
   /**
    * Manually refresh user data from current token.
-   * Useful when token has been updated externally.
+   * Decodes user profile from the ID token (which contains email, name, groups).
+   * Falls back to the access token if no ID token is available.
    */
   refreshUser(): void {
-    const token = this.authService.getAccessToken();
+    const idToken = this.authService.getIdToken();
+    const accessToken = this.authService.getAccessToken();
+    const token = idToken || accessToken;
     if (token) {
       this.updateUserFromToken(token);
     } else {

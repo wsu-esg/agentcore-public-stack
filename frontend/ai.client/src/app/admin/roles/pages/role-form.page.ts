@@ -443,7 +443,7 @@ export class RoleFormPage implements OnInit {
     grantedModels: this.fb.control<string[]>([], { nonNullable: true }),
     priority: this.fb.control(0, {
       nonNullable: true,
-      validators: [Validators.min(0), Validators.max(999)],
+      validators: [Validators.min(0), Validators.max(1000)],
     }),
     enabled: this.fb.control(true, { nonNullable: true }),
   });

@@ -1,12 +1,15 @@
 #!/bin/bash
-# Frontend install script - Install Angular dependencies
-# This script installs all frontend dependencies using npm ci
+# Frontend install script - Install Angular and CDK dependencies
+# This script installs all dependencies needed by the frontend workflow:
+#   1. Angular frontend dependencies (npm ci)
+#   2. CDK infrastructure dependencies (npm ci)
 
 set -euo pipefail
 
 # Get the repository root directory
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 FRONTEND_DIR="${REPO_ROOT}/frontend/ai.client"
+INFRA_DIR="${REPO_ROOT}/infrastructure"
 
 # Colors for output
 RED='\033[0;31m'
@@ -22,6 +25,14 @@ log_info() {
 log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+# ===========================================================
+# Install Frontend Dependencies
+# ===========================================================
 
 # Check if frontend directory exists
 if [ ! -d "${FRONTEND_DIR}" ]; then
@@ -68,9 +79,26 @@ else
     exit 1
 fi
 
-log_info "Frontend dependencies installed successfully!"
+log_success "Frontend dependencies installed successfully!"
 
 # Display Angular CLI version if available
 if [ -f "node_modules/.bin/ng" ]; then
     log_info "Angular CLI version: $(./node_modules/.bin/ng version --version 2>/dev/null || echo 'unknown')"
 fi
+
+# ===========================================================
+# Install CDK Dependencies
+# ===========================================================
+
+log_info "Installing CDK dependencies..."
+cd "${INFRA_DIR}"
+
+if [ -f "package-lock.json" ]; then
+    log_info "Running npm ci (clean install from package-lock.json)..."
+    npm ci
+else
+    log_error "package-lock.json not found. Cannot run npm ci."
+    exit 1
+fi
+
+log_success "CDK dependencies installed successfully"

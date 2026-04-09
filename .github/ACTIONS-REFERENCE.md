@@ -24,19 +24,23 @@ GitHub provides two mechanisms for storing configuration values:
 | AWS_SECRET_ACCESS_KEY | Secret | No | None | All | AWS secret access key for authentication (alternative to role-based auth) |
 | CDK_ALB_SUBDOMAIN | Variable | No | None | Infrastructure | Subdomain for ALB (e.g., 'api' for api.yourdomain.com) |
 | CDK_APP_API_CPU | Variable | No | `512` | Infrastructure, App API | CPU units for App API ECS task (256, 512, 1024, 2048, 4096) |
+| CDK_APP_API_CORS_ORIGINS | Variable | No | None | App API | Additional CORS origins for the app API only (appended to global CORS origins) |
 | CDK_APP_API_DESIRED_COUNT | Variable | No | `1` | Infrastructure, App API | Desired number of App API tasks running |
 | CDK_APP_API_ENABLED | Variable | No | `true` | App API | Enable/disable App API stack deployment |
 | CDK_APP_API_MAX_CAPACITY | Variable | No | `10` | Infrastructure, App API | Maximum App API tasks for auto-scaling |
 | CDK_APP_API_MEMORY | Variable | No | `1024` | Infrastructure, App API | Memory (MB) for App API ECS task (512, 1024, 2048, 4096, 8192) |
+| CDK_ASSISTANTS_CORS_ORIGINS | Variable | No | None | Infrastructure | Additional CORS origins for the assistants module only (appended to global CORS origins) |
 | CDK_AWS_ACCOUNT | Variable | Yes | None | All | 12-digit AWS account ID for CDK deployment |
 | CDK_CERTIFICATE_ARN | Variable | No | None | Infrastructure | ACM certificate ARN for HTTPS on ALB |
-| CDK_CORS_ORIGINS | Variable | No | `http://localhost:4200,http://localhost:8000` | All | Top-level CORS origins (default for sections that don't override) |
-| CDK_DOMAIN_NAME | Variable | No | None | Frontend, App API | Custom domain name (e.g., 'app.example.com') |
-| CDK_FILE_UPLOAD_CORS_ORIGINS | Variable | No | `http://localhost:4200` | Infrastructure, App API | Comma-separated CORS origins for file upload S3 bucket |
+| CDK_CORS_ORIGINS | Variable | No | None | All | Additional CORS origins appended to the auto-derived `https://{CDK_DOMAIN_NAME}`. Comma-separated. Use for localhost during local dev (e.g., `http://localhost:4200`) or extra domains. |
+| CDK_DOMAIN_NAME | Variable | No | None | All | Primary domain name (e.g., 'alpha.boisestate.ai'). Auto-applied as `https://{value}` to CORS origins for every stack. This is the primary mechanism for CORS configuration. |
+| CDK_FILE_UPLOAD_CORS_ORIGINS | Variable | No | None | Infrastructure | Additional CORS origins for the file upload S3 bucket only (appended to global CORS origins) |
 | CDK_FILE_UPLOAD_MAX_SIZE_MB | Variable | No | `10` | Infrastructure, App API | Maximum file upload size in megabytes |
 | CDK_FINE_TUNING_ENABLED | Variable | No | `false` | SageMaker Fine-Tuning, App API | Enable SageMaker fine-tuning stack and App API fine-tuning routes. Must be `true` before deploying the SageMaker Fine-Tuning workflow. |
+| CDK_FINE_TUNING_CORS_ORIGINS | Variable | No | None | SageMaker Fine-Tuning | Additional CORS origins for the fine-tuning S3 bucket only (appended to global CORS origins) |
 | CDK_FINE_TUNING_DEFAULT_QUOTA_HOURS | Variable | No | `0` | App API | Default monthly GPU-hour quota for all authenticated users. `0` = whitelist-only (admin must grant each user). Positive value (e.g. `5`) = open access with that default budget. |
 | CDK_FRONTEND_BUCKET_NAME | Variable | No | None | Frontend | S3 bucket name for frontend assets (defaults to generated name with account ID) |
+| CDK_FRONTEND_CORS_ORIGINS | Variable | No | None | Frontend | Additional CORS origins for the frontend SSM export only (appended to global CORS origins) |
 | CDK_FRONTEND_CERTIFICATE_ARN | Variable | No | None | Frontend | ACM certificate ARN for HTTPS on CloudFront (required for custom domain) |
 | CDK_FRONTEND_CLOUDFRONT_PRICE_CLASS | Variable | No | `PriceClass_100` | Frontend | CloudFront price class (PriceClass_100, PriceClass_200, PriceClass_All) |
 | CDK_FRONTEND_ENABLED | Variable | No | `true` | Frontend | Enable/disable Frontend stack deployment |
@@ -48,20 +52,16 @@ GitHub provides two mechanisms for storing configuration values:
 | CDK_GATEWAY_THROTTLE_RATE_LIMIT | Variable | No | `10000` | Gateway | API Gateway rate limit for throttling (requests per second) |
 | CDK_HOSTED_ZONE_DOMAIN | Variable | No | None | Infrastructure, App API | Route53 hosted zone domain name (e.g., 'example.com') |
 | CDK_INFERENCE_API_CPU | Variable | No | `1024` | Infrastructure, Inference API | CPU units for Inference API AgentCore Runtime (256, 512, 1024, 2048, 4096) |
+| CDK_INFERENCE_API_CORS_ORIGINS | Variable | No | None | Inference API | Additional CORS origins for the inference API only (appended to global CORS origins) |
 | CDK_INFERENCE_API_DESIRED_COUNT | Variable | No | `1` | Infrastructure, Inference API | Desired number of Inference API runtime instances |
 | CDK_INFERENCE_API_ENABLED | Variable | No | `true` | Inference API | Enable/disable Inference API stack deployment |
 | CDK_INFERENCE_API_MAX_CAPACITY | Variable | No | `5` | Infrastructure, Inference API | Maximum Inference API runtime instances for auto-scaling |
 | CDK_INFERENCE_API_MEMORY | Variable | No | `2048` | Infrastructure, Inference API | Memory (MB) for Inference API AgentCore Runtime (512, 1024, 2048, 4096, 8192) |
 | CDK_PRODUCTION | Variable | No | `true` | Frontend | Production environment flag (affects runtime config generation) |
 | CDK_PROJECT_PREFIX | Variable | Yes | `agentcore` | All | Prefix for all resource names (e.g., 'mycompany-agentcore') |
+| CDK_RAG_CORS_ORIGINS | Variable | No | None | RAG Ingestion | Additional CORS origins for the RAG documents S3 bucket only (appended to global CORS origins) |
 | CDK_RETAIN_DATA_ON_DELETE | Variable | No | `false` | All | Retain data resources (DynamoDB, S3, Secrets) on stack deletion |
 | CDK_VPC_CIDR | Variable | No | `10.0.0.0/16` | Infrastructure, App API | CIDR block for VPC network |
-| ENV_INFERENCE_API_CORS_ORIGINS | Variable | No | None | Inference API | Comma-separated CORS origins for runtime environment |
+| ENV_INFERENCE_API_CORS_ORIGINS | Variable | No | None | Inference API | _(Deprecated — use CDK_INFERENCE_API_CORS_ORIGINS instead)_ |
 | ENV_INFERENCE_API_LOG_LEVEL | Variable | No | `INFO` | Inference API | Log level for runtime container (DEBUG, INFO, WARNING, ERROR) |
-| SEED_ADMIN_JWT_ROLE | Variable | No | None | Bootstrap Data Seeding | JWT role that grants system admin access (e.g., `Admin`). Maps to the `system_admin` AppRole. |
-| SEED_AUTH_BUTTON_COLOR | Variable | No | None | Bootstrap Data Seeding | Hex color for the auth provider login button (e.g., '#0078D4') |
-| SEED_AUTH_CLIENT_ID | Variable | No | None | Bootstrap Data Seeding | OAuth client ID for the initial OIDC auth provider |
-| SEED_AUTH_CLIENT_SECRET | Secret | No | None | Bootstrap Data Seeding | OAuth client secret for the initial OIDC auth provider |
-| SEED_AUTH_DISPLAY_NAME | Variable | No | None | Bootstrap Data Seeding | Display name shown on the login page (e.g., 'Microsoft Entra ID') |
-| SEED_AUTH_ISSUER_URL | Variable | No | None | Bootstrap Data Seeding | OIDC issuer URL for the auth provider (e.g., 'https://login.microsoftonline.com/TENANT/v2.0') |
-| SEED_AUTH_PROVIDER_ID | Variable | No | None | Bootstrap Data Seeding | Slug identifier for the auth provider (e.g., 'entra-id') |
+| SEED_ADMIN_JWT_ROLE | Variable | No | None | Bootstrap Data Seeding | _(Deprecated)_ Previously used for JWT role mapping. Admin access is now granted automatically via the Cognito first-boot flow. |

@@ -63,7 +63,7 @@ async def request_presigned_url(
     - User storage quota: 1GB
     """
     logger.info(
-        f"User {user.email} requesting presigned URL for {request.filename} "
+        f"User {user.name} requesting presigned URL for {request.filename} "
         f"({request.size_bytes} bytes)"
     )
 
@@ -72,7 +72,7 @@ async def request_presigned_url(
         return response
 
     except InvalidFileTypeError as e:
-        logger.warning(f"Invalid file type from user {user.email}: {e.mime_type}")
+        logger.warning(f"Invalid file type from user {user.name}: {e.mime_type}")
         allowed = ", ".join(ALLOWED_MIME_TYPES.values())
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -81,7 +81,7 @@ async def request_presigned_url(
 
     except FileTooLargeError as e:
         logger.warning(
-            f"File too large from user {user.email}: "
+            f"File too large from user {user.name}: "
             f"{e.size_bytes} > {e.max_size}"
         )
         raise HTTPException(
@@ -91,7 +91,7 @@ async def request_presigned_url(
 
     except QuotaExceededError as e:
         logger.warning(
-            f"Quota exceeded for user {user.email}: "
+            f"Quota exceeded for user {user.name}: "
             f"{e.current_usage}/{e.max_allowed}"
         )
         raise HTTPException(

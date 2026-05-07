@@ -315,4 +315,16 @@ html.dark body {
     --color-tertiary-800: oklch(from #F0EAD6 calc(l - 0.2) c h);
     --color-tertiary-900: oklch(from #F0EAD6 calc(l - 0.25) c h);
     --color-tertiary-950: oklch(from #F0EAD6 calc(l - 0.3) c h);
+
+    --color-gray-50:  oklch(98% 0.006 17);
+    --color-gray-100: oklch(95% 0.008 17);
+    --color-gray-200: oklch(90% 0.010 17);
+    --color-gray-300: oklch(83% 0.012 17);
+    --color-gray-400: oklch(70% 0.014 17);
+    --color-gray-500: oklch(60% 0.016 17);
+    --color-gray-600: oklch(50% 0.018 17);
+    --color-gray-700: oklch(38% 0.020 17);
+    --color-gray-800: oklch(27% 0.022 17);
+    --color-gray-900: oklch(18% 0.024 17);
+    --color-gray-950: oklch(12% 0.026 17);
 }

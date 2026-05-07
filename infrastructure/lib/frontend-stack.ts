@@ -280,12 +280,10 @@ export class FrontendStack extends cdk.Stack {
       });
 
       // Create A record aliasing to CloudFront
-      new route53.ARecord(this, 'FrontendARecord', {
+      const cname = new route53.CnameRecord(this, 'FrontendARecord', {
         zone: hostedZone,
         recordName: config.domainName,
-        target: route53.RecordTarget.fromAlias(
-          new targets.CloudFrontTarget(this.distribution)
-        ),
+        domainName: this.distribution.domainName
       });
     }
 

@@ -118,7 +118,11 @@ export class FrontendStack extends cdk.Stack {
       cognitoDomainUrl: cognitoDomainUrl,
       cognitoAppClientId: cognitoAppClientId,
       cognitoRegion: config.awsRegion,
-      inferenceApiUrl: inferenceApiUrl,
+      // Route /invocations through the App API (BFF) so the browser never
+      // calls bedrock-agentcore.amazonaws.com directly — AWS does not add
+      // CORS headers to that endpoint. The App API proxies the request to
+      // the AgentCore Runtime using its own IAM credentials.
+      inferenceApiUrl: appApiUrl,
     };
 
     console.log('🔧 Generated runtime configuration:');

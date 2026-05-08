@@ -1,7 +1,7 @@
 <nav class="flex h-full flex-col">
     @if (isLoading()) {
         <div class="flex items-center justify-center py-8">
-            <span class="text-sm text-gray-500 dark:text-gray-400">Loading sessions...</span>
+            <span class="text-sm text-primary-300">Loading sessions...</span>
         </div>
     } @else if (error()) {
         <div class="flex items-center justify-center py-8">
@@ -12,7 +12,7 @@
             <div class="flex flex-col gap-y-4">
                 @for (group of groupedSessions(); track group.label) {
                     <section>
-                        <h3 class="px-2 pb-1 text-[11px]/5 font-medium text-gray-400 dark:text-gray-500">{{ group.label }}</h3>
+                        <h3 class="px-2 pb-1 text-[11px]/5 font-medium text-primary-300/70">{{ group.label }}</h3>
                         <ul role="list" class="flex flex-col gap-y-1">
                             @for (session of group.sessions; track session.sessionId) {
                                 <li class="group relative">
@@ -26,16 +26,16 @@
                                                 (input)="renameValue.set(renameInput.value)"
                                                 (keydown)="onRenameKeydown($event, session)"
                                                 (blur)="onRenameSubmit(session)"
-                                                class="min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm/6 font-medium text-gray-900 outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:focus:border-primary-400 dark:focus:ring-primary-400"
+                                                class="min-w-0 flex-1 rounded-md border border-primary-700 bg-primary-800 px-2 py-1 text-sm/6 font-medium text-white outline-none focus:border-primary-300 focus:ring-1 focus:ring-primary-300 placeholder:text-primary-300"
                                                 aria-label="Rename conversation"
                                             />
                                         </div>
                                     } @else {
                                         <a
                                             [routerLink]="['/s', getSessionId(session.sessionId)]"
-                                            routerLinkActive="bg-gray-200 !text-secondary-500 dark:bg-white/5 dark:!text-white"
+                                            routerLinkActive="bg-primary-800 !text-white"
                                             (click)="onSessionClick()"
-                                            class="flex gap-x-3 rounded-md px-2 py-2 pr-10 text-sm/6 font-medium text-gray-700 hover:bg-gray-50 hover:text-secondary-500 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-white"
+                                            class="flex gap-x-3 rounded-md px-2 py-2 pr-10 text-sm/6 font-medium text-primary-100 hover:bg-primary-800 hover:text-white"
                                         >
                                             <div class="flex min-w-0 flex-1 flex-col gap-y-1">
                                                 <div class="min-w-0 flex-auto truncate">
@@ -49,7 +49,7 @@
                                             [cdkMenuTriggerFor]="sessionMenu"
                                             [cdkMenuPosition]="menuPositions"
                                             [disabled]="deletingSessionId() === session.sessionId"
-                                            class="session-menu-trigger absolute right-1 top-1/2 -translate-y-1/2 flex size-7 items-center justify-center rounded-md text-gray-500 opacity-0 transition-opacity duration-150 ease-in hover:bg-gray-200 hover:text-gray-700 focus:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 group-hover:opacity-100 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200"
+                                            class="session-menu-trigger absolute right-1 top-1/2 -translate-y-1/2 flex size-7 items-center justify-center rounded-md text-primary-300 opacity-0 transition-opacity duration-150 ease-in hover:bg-primary-700 hover:text-white focus:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-300 group-hover:opacity-100"
                                             [attr.aria-label]="'Options for conversation: ' + getSessionTitle(session)"
                                             aria-haspopup="menu"
                                         >
@@ -109,9 +109,9 @@
             </div>
         } @else {
             <div class="text-center">
-                <ng-icon name="heroChatBubbleLeftRight" size="48" class="mx-auto text-gray-400 dark:text-gray-500" />
-                <h3 class="mt-2 text-sm font-semibold text-gray-900 dark:text-white">No Chats Yet</h3>
-                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by creating a new chat.</p>
+                <ng-icon name="heroChatBubbleLeftRight" size="48" class="mx-auto text-primary-400" />
+                <h3 class="mt-2 text-sm font-semibold text-primary-100">No Chats Yet</h3>
+                <p class="mt-1 text-sm text-primary-300">Get started by creating a new chat.</p>
             </div>
         }
     }

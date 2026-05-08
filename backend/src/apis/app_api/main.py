@@ -87,7 +87,8 @@ from apis.app_api.admin.routes import router as admin_router
 from apis.app_api.models.routes import router as models_router
 from apis.app_api.costs.routes import router as costs_router
 from apis.app_api.chat.routes import router as chat_router
-from apis.app_api.chat.converse_routes import router as converse_router
+from apis.app_api.chat.converse_routes import router as invocations_router
+from apis.app_api.chat.converse_routes import converse_router
 from apis.app_api.memory.routes import router as memory_router
 from apis.app_api.tools.routes import router as tools_router
 from apis.app_api.files.routes import router as files_router
@@ -112,7 +113,8 @@ app.include_router(user_settings_router)
 app.include_router(models_router)
 app.include_router(costs_router)
 app.include_router(chat_router)  # Application-specific chat endpoints
-app.include_router(converse_router)  # Proxies to Inference API for cost accounting
+app.include_router(invocations_router)  # Proxies /invocations to AgentCore Runtime (avoids browser CORS)
+app.include_router(converse_router)  # Proxies /chat/api-converse to Inference API for cost accounting
 app.include_router(memory_router)  # AgentCore Memory access endpoints
 app.include_router(tools_router)  # Tool discovery and permissions
 app.include_router(files_router)  # File upload via pre-signed URLs

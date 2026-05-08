@@ -1,4 +1,4 @@
-# Release Notes — v1.0.0-beta.24
+# Release Notes — v1.0.0-beta.25
 
 **Release Date:** May 8, 2026
 **Previous Release:** v1.0.0-beta.23 (April 29, 2026)

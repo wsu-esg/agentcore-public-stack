@@ -20,8 +20,11 @@ import logging
 import os
 
 import httpx
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
+
+from apis.shared.auth.dependencies import get_current_user
+from apis.shared.auth.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +41,7 @@ _INFERENCE_API_URL = os.environ.get("INFERENCE_API_URL", "http://localhost:8001"
         504: {"description": "AgentCore Runtime timed out"},
     },
 )
-async def invocations_proxy(request: Request):
+async def invocations_proxy(request: Request, _user: User = Depends(get_current_user)):
     """Forward /invocations to the AgentCore Runtime.
 
     The browser cannot call bedrock-agentcore.amazonaws.com directly because

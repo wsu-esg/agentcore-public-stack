@@ -63,7 +63,7 @@ if [ -z "${VERSION}" ]; then
     exit 1
 fi
 
-if ! [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.-]+)?$ ]]; then
+if ! [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
     echo -e "${RED}[ERROR]${NC} VERSION '${VERSION}' does not match SemVer format"
     exit 1
 fi

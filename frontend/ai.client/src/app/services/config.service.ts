@@ -31,6 +31,11 @@ export interface RuntimeConfig {
 
   /** Single inference API URL (replaces per-provider runtime endpoint resolution) */
   inferenceApiUrl: string;
+
+  /** AgentCore Runtime URL used directly for WebSocket voice connections.
+   *  Voice uses WebSocket (not browser HTTP), so CORS is not an issue and
+   *  it can connect to the runtime endpoint directly. */
+  voiceApiUrl: string;
 }
 
 /**
@@ -126,6 +131,25 @@ export class ConfigService {
     const arn = raw.substring(idx + marker.length);
     return base + encodeURIComponent(arn);
   });
+
+  /**
+   * Computed signal for the AgentCore Runtime URL used for WebSocket voice.
+   * URL-encodes the ARN portion just like inferenceApiUrl.
+   * Voice connects via WebSocket directly to the runtime (CORS is not an
+   * issue for WebSocket upgrades), so this bypasses the app-api proxy.
+   */
+  readonly voiceApiUrl = computed(() => {
+    const raw = this.config()?.voiceApiUrl ?? '';
+    if (!raw) return '';
+
+    const marker = '/runtimes/';
+    const idx = raw.indexOf(marker);
+    if (idx === -1) return raw;
+
+    const base = raw.substring(0, idx + marker.length);
+    const arn = raw.substring(idx + marker.length);
+    return base + encodeURIComponent(arn);
+  });
   
   /**
    * Read-only signal indicating if configuration has been loaded
@@ -185,6 +209,7 @@ export class ConfigService {
         cognitoAppClientId: (environment as any).cognitoAppClientId || '',
         cognitoRegion: (environment as any).cognitoRegion || 'us-east-1',
         inferenceApiUrl: (environment as any).inferenceApiUrl || 'http://localhost:8001',
+        voiceApiUrl: (environment as any).voiceApiUrl || (environment as any).inferenceApiUrl || 'http://localhost:8001',
       };
       
       console.log('📋 Using fallback configuration from environment.ts');

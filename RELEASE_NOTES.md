@@ -1,3 +1,79 @@
+# Release Notes — v1.0.0-beta.24
+
+**Release Date:** May 8, 2026
+**Previous Release:** v1.0.0-beta.23 (April 29, 2026)
+
+---
+
+## Highlights
+
+This release fixes a browser CORS failure where the frontend was calling the AgentCore Runtime endpoint (`bedrock-agentcore.amazonaws.com`) directly — an AWS-managed endpoint that does not return CORS headers. Chat invocations are now routed through the App API as a server-side proxy, aligning with the intended BFF architecture. Voice WebSocket connections are split into a dedicated `voiceApiUrl` config field and continue to connect directly to the runtime (WebSocket upgrades are not subject to CORS). The release also includes a WSU crimson/gray rebrand across the sidebar, session list, and navigation components.
+
+---
+
+## Bug Fix — CORS on AgentCore Runtime Invocations
+
+### Root Cause
+
+`config.json` was populated with `inferenceApiUrl` set to the raw AgentCore Runtime endpoint (`https://bedrock-agentcore.<region>.amazonaws.com/runtimes/<arn>`). The Angular frontend called this URL directly via `fetchEventSource`, triggering a browser CORS preflight. AWS does not add `Access-Control-Allow-Origin` headers to that endpoint, so all chat requests were blocked.
+
+### Fix
+
+**Backend** (`backend/src/apis/app_api/chat/converse_routes.py`):
+- Added `POST /invocations` proxy endpoint to the App API that forwards requests server-side to the AgentCore Runtime URL stored in `INFERENCE_API_URL`
+- Passes through `Authorization`, `OAuth2CallbackUrl`, and `qualifier` query param unchanged
+- Relays the SSE stream back to the browser intact
+- Added `get_current_user` as a FastAPI dependency so unauthenticated requests return 401 before the proxy logic runs (fixes `TestAuthEnforcementSweep` property-based test)
+
+**Infrastructure** (`infrastructure/lib/app-api-stack.ts`):
+- Added `INFERENCE_API_URL` env var to the App API Fargate task definition, reading the AgentCore Runtime endpoint from SSM parameter `/<prefix>/inference-api/runtime-endpoint-url`
+
+**Frontend** (`infrastructure/lib/frontend-stack.ts`):
+- `inferenceApiUrl` in `config.json` now set to `appApiUrl` (the ALB/CloudFront domain) instead of the raw AgentCore Runtime URL — the browser only ever calls the same origin
+
+---
+
+## Bug Fix — Voice WebSocket Split
+
+### Root Cause
+
+`VoiceChatService` derived its WebSocket URL from `inferenceApiUrl`. After the CORS fix above changed `inferenceApiUrl` to the App API URL, the voice service tried to open a WebSocket to the App API, which has no `/ws` or `/voice/stream` endpoint, producing a 400 "Not a WebSocket Upgrade Request" error.
+
+### Fix
+
+**Frontend** (`frontend/ai.client/src/app/services/config.service.ts`):
+- Added `voiceApiUrl` field to `RuntimeConfig` interface and a corresponding `voiceApiUrl` computed signal with the same ARN URL-encoding logic as `inferenceApiUrl`
+- `VoiceChatService` now reads `configService.voiceApiUrl()` instead of `configService.inferenceApiUrl()`
+
+**Infrastructure** (`infrastructure/lib/frontend-stack.ts`):
+- `config.json` now includes `voiceApiUrl` set to the raw AgentCore Runtime endpoint (SSM `/<prefix>/inference-api/runtime-endpoint-url`)
+- WebSocket upgrades are not subject to browser CORS policy, so the runtime can be called directly
+
+**Local dev** (`frontend/ai.client/src/environments/environment.ts`):
+- Added `voiceApiUrl: 'http://localhost:8001'` fallback
+
+---
+
+## Branding — WSU Crimson/Gray Theme
+
+### Frontend
+
+- **Sidebar** (`sidenav.html`, `session-list.html`): Background changed from `bg-gray-100` to `bg-primary-900` (crimson). All text, icon, hover, active, and border colors updated to the `primary-*` scale. Session list group labels, empty state, rename input, and ellipsis menu button all updated to match.
+- **User dropdown** (`user-dropdown.component.ts`): Trigger button hover updated to `hover:bg-primary-800`, avatar fallback uses `bg-primary-700`, username text is white, chevron is `text-primary-300`.
+- **Expand/open sidebar buttons** (`app.html`): Floating buttons shown when sidebar is collapsed now use `bg-primary-900` to match the sidebar.
+- **Theme variables** (`styles.css`): Crimson (`#DC143C`) primary scale and warm-tinted gray scale were already defined; gray scale hue angle set to `17` (warm) to complement crimson.
+- **Logos and favicons**: Updated to WSU branding assets (`logo-light.png`, `logo-dark.png`, favicon set).
+
+---
+
+## Deployment Notes
+
+- **App API container must be rebuilt and redeployed** to pick up the new `/invocations` proxy route and the `INFERENCE_API_URL` env var.
+- **CDK deploy required** for `AppApiStack` (adds `INFERENCE_API_URL` to task definition) and `FrontendStack` (updates `config.json` with new `inferenceApiUrl` and `voiceApiUrl` values).
+- **Frontend assets must be redeployed** to S3 to serve the updated `config.json`.
+
+---
+
 # Release Notes — v1.0.0-beta.23
 
 **Release Date:** April 29, 2026

@@ -1,4 +1,4 @@
-<div class="relative flex h-full flex-col w-72 border-r border-gray-300 bg-gray-100 dark:border-white/10 dark:bg-gray-900">
+<div class="relative flex h-full flex-col w-72 border-r border-primary-800 bg-primary-900 dark:border-primary-950 dark:bg-primary-950">
     <div class="flex h-16 shrink-0 items-center justify-between px-4">
         <img src="img/logo-light.png" alt="Boise State University Logo" class="h-12 w-auto dark:hidden" />
         <img src="img/logo-dark.png" alt="Boise State University Logo" class="h-12 w-auto hidden dark:block" />
@@ -8,7 +8,7 @@
             (click)="toggleCollapse()"
             [appTooltip]="'Close sidebar'"
             appTooltipPosition="right"
-            class="hidden lg:flex items-center justify-center size-8 rounded-md text-gray-500 hover:bg-gray-200 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"
+            class="hidden lg:flex items-center justify-center size-8 rounded-md text-primary-200 hover:bg-primary-800 hover:text-white dark:text-primary-300 dark:hover:bg-primary-800 dark:hover:text-white"
             aria-label="Collapse sidebar">
             <!-- Sidebar panel icon -->
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="size-6" aria-hidden="true">
@@ -23,27 +23,27 @@
         <button
             (click)="newSession()"
             type="button"
-            class="group flex w-full cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-gray-200/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-500 dark:hover:bg-white/5">
-            <div class="flex size-7 shrink-0 items-center justify-center text-secondary-500 dark:text-secondary-400">
+            class="group flex w-full cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-primary-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-300">
+            <div class="flex size-7 shrink-0 items-center justify-center text-primary-200">
                 <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                 </svg>
             </div>
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">New Session</span>
+            <span class="text-sm font-medium text-primary-100">New Session</span>
         </button>
 
         <!-- Assistants -->
         <a
             routerLink="/assistants"
-            routerLinkActive="bg-gray-200/80 dark:bg-white/10"
+            routerLinkActive="bg-primary-800"
             (click)="sidenavService.close()"
-            class="group flex w-full cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-gray-200/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-secondary-500 dark:hover:bg-white/5">
-            <div class="flex size-7 shrink-0 items-center justify-center text-gray-500 dark:text-gray-400">
+            class="group flex w-full cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 text-left transition-colors hover:bg-primary-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-300">
+            <div class="flex size-7 shrink-0 items-center justify-center text-primary-300">
                 <svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 0 0 .75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 0 0-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0 1 12 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 0 1-.673-.38m0 0A2.18 2.18 0 0 1 3 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 0 1 3.413-.387m7.5 0V5.25A2.25 2.25 0 0 0 13.5 3h-3a2.25 2.25 0 0 0-2.25 2.25v.894m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                 </svg>
             </div>
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Assistants</span>
+            <span class="text-sm font-medium text-primary-100">Assistants</span>
         </a>
     </div>
 
@@ -53,7 +53,7 @@
 
     <!-- User dropdown fixed at bottom -->
     @if (userService.currentUser(); as user) {
-        <div class="shrink-0 border-t border-gray-200 px-3 py-3 dark:border-white/10">
+        <div class="shrink-0 border-t border-primary-800 px-3 py-3">
             <app-user-dropdown [user]="user" [isAdmin]="isAdmin()" (logout)="handleLogout()"></app-user-dropdown>
         </div>
     }

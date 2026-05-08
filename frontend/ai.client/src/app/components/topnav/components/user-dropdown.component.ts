@@ -53,7 +53,7 @@ export interface User {
         type="button"
         [cdkMenuTriggerFor]="userMenu"
         [cdkMenuPosition]="menuPositionsComputed()"
-        class="relative flex w-full items-center gap-3 rounded-lg px-2 py-2 hover:bg-gray-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-primary)] dark:hover:bg-white/10"
+        class="relative flex w-full items-center gap-3 rounded-lg px-2 py-2 hover:bg-primary-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-300"
         aria-label="User menu"
       >
         <span class="sr-only">Open user menu</span>
@@ -65,20 +65,20 @@ export interface User {
             class="size-8 shrink-0 rounded-full bg-gray-50 outline -outline-offset-1 outline-black/5 dark:bg-gray-800 dark:outline-white/10"
           />
         } @else {
-          <div class="size-8 shrink-0 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center outline -outline-offset-1 outline-black/5 dark:outline-white/10">
-            <span class="text-xs font-semibold text-gray-600 dark:text-gray-300">
+          <div class="size-8 shrink-0 rounded-full bg-primary-700 flex items-center justify-center outline -outline-offset-1 outline-primary-600">
+            <span class="text-xs font-semibold text-white">
               {{ getUserInitial() }}
             </span>
           </div>
         }
 
         <span class="flex min-w-0 flex-1 items-center justify-between">
-          <span class="truncate text-sm/6 font-semibold text-gray-900 dark:text-white">
+          <span class="truncate text-sm/6 font-semibold text-white">
             {{ user().fullName }}
           </span>
           <ng-icon
             name="heroChevronUpDown"
-            class="size-5 shrink-0 text-gray-400"
+            class="size-5 shrink-0 text-primary-300"
           />
         </span>
       </button>

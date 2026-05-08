@@ -405,6 +405,12 @@ export class AppApiStack extends cdk.Stack {
         PROJECT_PREFIX: config.projectPrefix,
         FRONTEND_URL: config.domainName ? `https://${config.domainName}` : 'http://localhost:4200',
         CORS_ORIGINS: buildCorsOrigins(config, config.appApi.additionalCorsOrigins).join(','),
+        // AgentCore Runtime endpoint — App API proxies /invocations here so
+        // the browser never calls bedrock-agentcore.amazonaws.com directly.
+        INFERENCE_API_URL: ssm.StringParameter.valueForStringParameter(
+          this,
+          `/${config.projectPrefix}/inference-api/runtime-endpoint-url`
+        ),
         // OAuth2 callback URL fallback when the frontend's `OAuth2CallbackUrl`
         // header is absent — see apis/shared/oauth/agentcore_identity.py.
         AGENTCORE_LOCAL_OAUTH_CALLBACK_URL: config.domainName

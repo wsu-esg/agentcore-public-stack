@@ -36,4 +36,5 @@ export const environment = {
     cognitoAppClientId: '',
     cognitoRegion: 'us-east-1',
     inferenceApiUrl: '',
+    voiceApiUrl: '',
 };

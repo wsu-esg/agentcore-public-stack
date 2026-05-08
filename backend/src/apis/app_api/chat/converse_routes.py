@@ -54,8 +54,25 @@ async def invocations_proxy(request: Request, _user: User = Depends(get_current_
 
     The SSE stream is relayed back to the browser as-is.
     """
-    # Build target URL, preserving the qualifier query param if present
+    # Build target URL, preserving the qualifier query param if present.
+    # Strip any trailing path segment that may have been included in the
+    # configured URL (e.g. /invocations or /ws) to avoid doubling.
     base_url = _INFERENCE_API_URL.rstrip("/")
+    for suffix in ("/invocations", "/ws"):
+        if base_url.endswith(suffix):
+            base_url = base_url[: -len(suffix)]
+            break
+
+    # The AgentCore Runtime URL contains an ARN in the path
+    # (e.g. .../runtimes/arn:aws:bedrock-agentcore:...) whose colons and
+    # slashes must be percent-encoded for the request to route correctly.
+    marker = "/runtimes/"
+    idx = base_url.find(marker)
+    if idx != -1:
+        from urllib.parse import quote
+        prefix = base_url[: idx + len(marker)]
+        arn = base_url[idx + len(marker):]
+        base_url = prefix + quote(arn, safe="")
     qualifier = request.query_params.get("qualifier")
     target_url = f"{base_url}/invocations"
     if qualifier:

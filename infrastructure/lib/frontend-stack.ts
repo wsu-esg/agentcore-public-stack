@@ -123,6 +123,9 @@ export class FrontendStack extends cdk.Stack {
       // CORS headers to that endpoint. The App API proxies the request to
       // the AgentCore Runtime using its own IAM credentials.
       inferenceApiUrl: appApiUrl,
+      // Voice uses WebSocket — CORS is not an issue for WS upgrades, so
+      // it connects to the AgentCore Runtime directly.
+      voiceApiUrl: inferenceApiUrl,
     };
 
     console.log('🔧 Generated runtime configuration:');

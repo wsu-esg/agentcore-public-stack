@@ -158,8 +158,10 @@ export class VoiceChatService implements OnDestroy {
         throw new Error('No authentication token available');
       }
 
-      // Build WebSocket URL from inference API URL
-      const httpUrl = this.configService.inferenceApiUrl();
+      // Build WebSocket URL from the AgentCore Runtime URL directly.
+      // Voice uses WebSocket (not browser HTTP), so CORS is not an issue —
+      // it connects to the runtime endpoint directly, bypassing the app-api proxy.
+      const httpUrl = this.configService.voiceApiUrl();
       const wsUrl = httpUrl.replace(/^http/, 'ws');
       const isAgentCore = httpUrl.includes('/runtimes/');
 

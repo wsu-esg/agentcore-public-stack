@@ -941,7 +941,7 @@ export class InferenceApiStack extends cdk.Stack {
       // HTTP protocol supports both REST (/invocations) and WebSocket (/ws) endpoints
       protocolConfiguration: 'HTTP',
       requestHeaderConfiguration: {
-        requestHeaderAllowlist: ['Authorization'],
+        requestHeaderAllowlist: ['Authorization', 'Content-Type'],
       },
       environmentVariables: {
         // Basic configuration

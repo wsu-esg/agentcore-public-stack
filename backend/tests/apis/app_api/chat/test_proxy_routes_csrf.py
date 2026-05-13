@@ -9,9 +9,9 @@ double-submit token allows the request through.
 from __future__ import annotations
 
 import time
-from typing import Optional
+from typing import List, Optional
 
-import httpx
+import aiohttp
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -81,20 +81,53 @@ def _build_app(record: Optional[SessionRecord]) -> FastAPI:
     return app
 
 
-def _ok_handler(request: httpx.Request) -> httpx.Response:
-    return httpx.Response(
-        200,
-        content=b"event: done\ndata: {}\n\n",
-        headers={"content-type": "text/event-stream"},
-    )
+class _OkWSMessage:
+    type = aiohttp.WSMsgType.TEXT
+    data = "event: done\ndata: {}\n\n"
+
+
+class _OkWS:
+    """Minimal WebSocket stand-in that yields a single done frame."""
+
+    def __init__(self) -> None:
+        self._done = False
+        self.sent: List[str] = []
+
+    async def send_str(self, text: str) -> None:
+        self.sent.append(text)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self._done:
+            raise StopAsyncIteration
+        self._done = True
+        return _OkWSMessage()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_):
+        pass
+
+
+class _OkSession:
+    def ws_connect(self, *_, **__):
+        return _OkWS()
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_):
+        pass
 
 
 def _patch_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
-    transport = httpx.MockTransport(_ok_handler)
     monkeypatch.setattr(
         proxy_routes,
-        "_build_upstream_client",
-        lambda: httpx.AsyncClient(transport=transport),
+        "_build_aiohttp_session",
+        lambda _timeout: _OkSession(),
     )
 
 

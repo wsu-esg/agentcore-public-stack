@@ -1,32 +1,29 @@
 """BFF chat proxy — forwards browser SSE chat requests to inference-api.
 
-`POST /chat/stream` is the cookie-authenticated counterpart to the SPA's
-current direct-to-inference-api chat call. The flow:
+Browser → CloudFront /api/* → app-api → AgentCore Runtime WebSocket /ws
+                                       → inference-api /ws (chat_invocation dispatch)
+                                       → SSE streamed back to browser
 
-  Browser  → CloudFront `/api/*`  → app-api  → inference-api `/invocations`
-           (httpOnly session cookie)         (Authorization: Bearer <token>)
+Cloud: connects to the AgentCore Runtime via WebSocket at the /ws path
+(same network path used by voice). The request body is sent as a
+``chat_invocation`` typed first message; the container streams SSE chunks
+back as WebSocket text frames, which the BFF relays as text/event-stream.
 
-`SessionRefreshMiddleware` resolves the cookie and, if the stored Cognito
-access token is near expiry, refreshes it before this handler runs. The
-handler then forwards `current_user.raw_token` — the freshly-validated
-access token — to inference-api, which already accepts Cognito Bearer
-tokens via `get_current_user_trusted` on `/invocations`. No inference-api
-changes needed (architecture decision #4 in the BFF migration plan).
-
-The legacy in-process Bearer agent route that previously owned `/chat/stream`
-was renamed to `/chat/agent-stream` in the Phase 6 cutover. The Phase 4
-`/chat/proxy-stream` rolling-deploy alias was deleted in Phase 7.
+Local dev: INFERENCE_API_URL is http://localhost:8001; the BFF connects via
+WebSocket to ws://localhost:8001/ws and uses the same protocol. No Runtime
+gateway is in the path, so no Sec-WebSocket-Protocol auth is needed.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import os
-
-import httpx
-from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse
 from urllib.parse import quote, urlsplit
+
+import aiohttp
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import StreamingResponse
 
 from apis.shared.auth.dependencies import get_current_user_from_session
 from apis.shared.auth.models import User
@@ -35,149 +32,154 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["bff-chat-proxy"])
 
+_CONNECT_TIMEOUT = 15.0
+# Long enough to cover a full agent turn (model + tool calls), bounded so a
+# wedged upstream eventually surfaces.
+_STREAM_TIMEOUT = 300.0
+
+
 def _inference_api_url() -> str:
     return os.environ.get("INFERENCE_API_URL", "http://localhost:8001")
 
-# Long enough to cover a full agent turn (model + tool calls), bounded so a
-# wedged upstream eventually surfaces.
-_PROXY_TIMEOUT_SECONDS = 300.0
 
+def _build_upstream_ws_url(base_url: str) -> str:
+    """Resolve the upstream WebSocket URL from ``INFERENCE_API_URL``.
 
-def _build_invocations_url(base_url: str) -> str:
-    """Resolve the upstream `/invocations` URL from `INFERENCE_API_URL`.
+    Cloud: AgentCore Runtime WebSocket endpoint at
+    ``/runtimes/<encoded-arn>/ws`` — the same path used by the voice proxy.
+    The Runtime routes this WebSocket to the container's ``/ws`` handler,
+    which dispatches based on the first message type.
 
-    Cloud: `INFERENCE_API_URL` is the AgentCore Runtime data-plane base
-    (`https://bedrock-agentcore.<region>.amazonaws.com/runtimes/<ARN>`),
-    where `<ARN>` is unencoded in SSM. The data-plane route is
-    `POST /runtimes/{agentRuntimeArn}/invocations?qualifier={qualifier}`
-    with `{agentRuntimeArn}` as a single URL-encoded path segment — so the
-    ARN's literal `/` and `:` must be percent-encoded or AWS returns 404.
-    A `qualifier` is also required; we use `DEFAULT`.
-
-    Local dev: `INFERENCE_API_URL` is `http://localhost:8001`, where
-    `/invocations` is a real FastAPI route on inference-api directly. No
-    encoding or qualifier needed.
+    Local dev: ``ws://localhost:8001/ws`` — the inference-api container
+    directly, bypassing the Runtime gateway entirely.
     """
     parts = urlsplit(base_url)
+    scheme = "wss" if parts.scheme == "https" else "ws"
     prefix = "/runtimes/"
     if parts.netloc.startswith("bedrock-agentcore.") and parts.path.startswith(prefix):
         arn = parts.path[len(prefix):]
         encoded_arn = quote(arn, safe="")
-        return f"{parts.scheme}://{parts.netloc}/runtimes/{encoded_arn}/invocations?qualifier=DEFAULT"
-    return f"{base_url}/invocations"
+        return f"{scheme}://{parts.netloc}/runtimes/{encoded_arn}/ws"
+    return f"{scheme}://{parts.netloc}/ws"
 
 
-def _build_upstream_client() -> httpx.AsyncClient:
-    """Single seam where the proxy's upstream client is constructed.
+def _bearer_subprotocol(access_token: str) -> str:
+    """Pack a Cognito access token into AgentCore's accepted subprotocol form.
 
-    Tests substitute a MockTransport-backed client here without having to
-    monkey-patch the global `httpx.AsyncClient` symbol — which would also
-    intercept any test-side httpx clients running in the same process.
+    The Runtime's JWT Authorizer reads ``base64UrlBearerAuthorization.<b64url>``
+    from ``Sec-WebSocket-Protocol`` on the upgrade.
     """
-    return httpx.AsyncClient(timeout=httpx.Timeout(_PROXY_TIMEOUT_SECONDS))
+    import base64
+
+    b64 = base64.urlsafe_b64encode(access_token.encode("utf-8")).decode("ascii")
+    return f"base64UrlBearerAuthorization.{b64.rstrip('=')}"
+
+
+async def _relay_chat_stream(
+    body: bytes,
+    access_token: str,
+    oauth_callback_url: str | None,
+):
+    """Open a WebSocket to the upstream and relay SSE chunks as an async generator.
+
+    Sends the InvocationRequest body as a ``chat_invocation`` config message,
+    then yields each WebSocket text frame verbatim. The container's ``/ws``
+    chat handler sends SSE-formatted strings
+    (``event: ...\ndata: ...\n\n``) as text frames, so the BFF can relay
+    them straight into a ``StreamingResponse`` without re-encoding.
+    """
+    base_url = _inference_api_url()
+    ws_url = _build_upstream_ws_url(base_url)
+
+    parts = urlsplit(ws_url)
+    is_cloud = parts.netloc.startswith("bedrock-agentcore.")
+
+    protocols: list[str] = []
+    headers: dict[str, str] = {}
+    if is_cloud:
+        protocols = [_bearer_subprotocol(access_token), "base64UrlBearerAuthorization"]
+    else:
+        # Local dev: inference-api trusts a plain Authorization header on
+        # the upgrade; the /ws handler reads auth_token from the config
+        # message as the authoritative source.
+        headers["Authorization"] = f"Bearer {access_token}"
+
+    timeout = aiohttp.ClientTimeout(total=_STREAM_TIMEOUT, connect=_CONNECT_TIMEOUT)
+
+    try:
+        body_dict = json.loads(body)
+    except Exception:
+        yield f"event: stream_error\ndata: {json.dumps({'message': 'invalid request body'})}\n\n"
+        yield "event: done\ndata: {}\n\n"
+        return
+
+    config_msg: dict = {
+        "type": "chat_invocation",
+        "body": body_dict,
+        "auth_token": access_token,
+    }
+    if oauth_callback_url:
+        # OAuth2CallbackUrl cannot travel as a WebSocket header through the
+        # Runtime gateway, so it's embedded in the message body. The /ws
+        # handler sets it in BedrockAgentCoreContext before calling invocations.
+        config_msg["oauth2_callback_url"] = oauth_callback_url
+
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        try:
+            async with session.ws_connect(
+                ws_url,
+                protocols=protocols or (),
+                headers=headers,
+                max_msg_size=0,  # unbounded — large tool results can be big
+            ) as ws:
+                await ws.send_str(json.dumps(config_msg, separators=(",", ":")))
+
+                async for msg in ws:
+                    if msg.type == aiohttp.WSMsgType.TEXT:
+                        yield msg.data
+                    elif msg.type in (
+                        aiohttp.WSMsgType.CLOSE,
+                        aiohttp.WSMsgType.CLOSED,
+                        aiohttp.WSMsgType.CLOSING,
+                    ):
+                        break
+                    elif msg.type == aiohttp.WSMsgType.ERROR:
+                        logger.error("Upstream chat WS error: %s", ws.exception())
+                        yield f"event: stream_error\ndata: {json.dumps({'message': 'upstream stream error'})}\n\n"
+                        yield "event: done\ndata: {}\n\n"
+                        break
+
+        except aiohttp.WSServerHandshakeError as exc:
+            logger.error("Chat WS handshake failed: %s", exc)
+            yield f"event: stream_error\ndata: {json.dumps({'message': f'upstream rejected ({exc.status})'})}\n\n"
+            yield "event: done\ndata: {}\n\n"
+        except aiohttp.ClientConnectorError as exc:
+            logger.error("Chat WS connect failed: %s", exc)
+            yield f"event: stream_error\ndata: {json.dumps({'message': 'upstream unreachable'})}\n\n"
+            yield "event: done\ndata: {}\n\n"
+        except Exception as exc:
+            logger.error("Chat WS relay error: %s", exc, exc_info=True)
+            yield f"event: stream_error\ndata: {json.dumps({'message': 'proxy error'})}\n\n"
+            yield "event: done\ndata: {}\n\n"
 
 
 async def chat_stream(
     request: Request,
     current_user: User = Depends(get_current_user_from_session),
 ):
-    """Relay the request body verbatim to inference-api `/invocations`.
-
-    The body is opaque bytes — validation lives on inference-api so this
-    handler stays decoupled from the InvocationRequest schema. SSE chunks
-    flow back unmodified; `X-Accel-Buffering: no` defeats proxy buffering
-    so streaming events (notably `oauth_required` after `message_stop`)
-    reach the browser without being held back by an intermediary.
-    """
-    target_url = _build_invocations_url(_inference_api_url())
-    logger.info(f"Target URL: {target_url}")
-    logger.info(f"Raw token: {current_user.raw_token}")
+    """Relay the browser's SSE chat request to inference-api via AgentCore Runtime WebSocket."""
     body = await request.body()
+    # Forward OAuth2CallbackUrl so the container can set it in
+    # BedrockAgentCoreContext for MCP OAuth consent flows.
+    oauth_callback_url = request.headers.get("OAuth2CallbackUrl")
 
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {current_user.raw_token}",
-    }
-
-    # Forward OAuth2CallbackUrl when the SPA supplies it. Inference-api's
-    # AgentCoreContextMiddleware reads this header to scope the on-tool
-    # OAuth consent landing URL to the SPA's origin (allowlisted via
-    # CORS_ORIGINS). Without it, MCP-tool consent flows can't redirect
-    # back to the SPA's `/oauth-complete` page and `oauth_required` SSE
-    # events are unusable. Forwarded as-is — the inference-api side
-    # re-validates against its own CORS_ORIGINS allowlist.
-    forwarded_callback = request.headers.get("OAuth2CallbackUrl")
-    if forwarded_callback:
-        headers["OAuth2CallbackUrl"] = forwarded_callback
-
-    # The client lifecycle must outlive this handler — closing it via
-    # `async with` while a stream is in flight makes httpx drain the upstream
-    # response during `__aexit__`, buffering the entire SSE stream before
-    # headers reach the browser. Open the client manually and tie its
-    # cleanup to the streaming generator's `finally` (or to the early-exit
-    # paths below) so headers can flush as soon as the upstream's first
-    # response message arrives.
-    client = _build_upstream_client()
-    try:
-        response = await client.send(
-            client.build_request("POST", target_url, headers=headers, content=body),
-            stream=True,
-        )
-    except httpx.ConnectError:
-        await client.aclose()
-        logger.error(f"Cannot reach Inference API at {target_url}")
-        raise HTTPException(status_code=502, detail="Inference API is unreachable")
-    except httpx.TimeoutException:
-        await client.aclose()
-        logger.error(f"Inference API request timed out: {target_url}")
-        raise HTTPException(status_code=504, detail="Inference API request timed out")
-    except Exception as exc:
-        await client.aclose()
-        logger.error(f"BFF chat proxy error: {exc}", exc_info=True)
-        raise HTTPException(
-            status_code=502,
-            detail="An unexpected error occurred while proxying to the Inference API",
-        )
-
-    if response.status_code >= 400:
-        try:
-            error_body = await response.aread()
-        finally:
-            await response.aclose()
-            await client.aclose()
-        raise HTTPException(
-            status_code=response.status_code,
-            detail=error_body.decode("utf-8", errors="replace"),
-        )
-
-    content_type = response.headers.get("content-type", "")
-    if "text/event-stream" in content_type:
-        async def stream_relay():
-            try:
-                async for chunk in response.aiter_bytes():
-                    yield chunk
-            finally:
-                await response.aclose()
-                await client.aclose()
-
-        return StreamingResponse(
-            stream_relay(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "X-Accel-Buffering": "no",
-            },
-        )
-
-    try:
-        response_body = await response.aread()
-    finally:
-        await response.aclose()
-        await client.aclose()
     return StreamingResponse(
-        iter([response_body]),
-        media_type=content_type or "application/json",
-        status_code=response.status_code,
+        _relay_chat_stream(body, current_user.raw_token, oauth_callback_url),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
@@ -185,7 +187,7 @@ router.add_api_route(
     "/stream",
     chat_stream,
     methods=["POST"],
-    summary="Cookie-authenticated SSE proxy to inference-api /invocations",
+    summary="Cookie-authenticated SSE proxy to inference-api via AgentCore Runtime WebSocket",
     operation_id="chat_stream",
     responses={
         401: {"description": "No active BFF session"},

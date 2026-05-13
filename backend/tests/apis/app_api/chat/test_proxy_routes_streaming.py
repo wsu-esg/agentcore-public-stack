@@ -1,20 +1,13 @@
-"""Streaming-behavior integration test for `POST /chat/stream`.
+"""Streaming-behavior tests for the BFF chat proxy.
 
-The migration plan calls out a buffering risk on SSE events that arrive
-late in the stream — most importantly the `oauth_required` event, which
-is emitted *after* `message_stop` and would be hidden from the SPA if
-the proxy (or any intermediary) read the upstream response to completion
-before flushing headers downstream.
+Verifies that SSE chunks received from the upstream WebSocket are forwarded
+to the browser incrementally (not buffered), and that late-arriving events
+such as ``oauth_required`` reach the client after ``message_stop``.
 
-This test runs the proxy behind a real uvicorn server (NOT
-`httpx.ASGITransport`, which buffers the entire body before exposing
-headers — useless for measuring TTFB) and points it at a slow upstream
-that yields one SSE chunk, sleeps, then yields more. We assert:
-
-  - response headers reach the client well under 200ms (TTFB),
-  - `X-Accel-Buffering: no` is set on the response,
-  - total stream consumption takes at least the upstream gap, proving
-    the body is actually streamed (not buffered then flushed).
+The proxy's streaming guarantee comes from iterating the upstream WebSocket
+async-for and yielding each frame directly. These tests exercise that path
+through a real uvicorn server with a mock aiohttp session that delivers
+frames with a deliberate inter-chunk delay.
 """
 
 from __future__ import annotations
@@ -23,7 +16,9 @@ import asyncio
 import socket
 import threading
 import time
+from typing import List
 
+import aiohttp
 import httpx
 import pytest
 import uvicorn
@@ -33,7 +28,6 @@ from apis.app_api.chat import proxy_routes
 from apis.app_api.chat.proxy_routes import router as proxy_router
 from apis.shared.auth.dependencies import get_current_user_from_session
 from apis.shared.auth.models import User
-
 
 # Upstream delay between SSE chunks — short enough to keep the test fast,
 # long enough that buffering vs. streaming is unambiguously distinguishable.
@@ -59,9 +53,6 @@ def _free_port() -> int:
 
 
 class _UvicornInThread:
-    """Tiny harness: run uvicorn in a daemon thread on a free port, block
-    until the socket accepts connections, and tear it down on exit."""
-
     def __init__(self, app: FastAPI) -> None:
         self.port = _free_port()
         self.url = f"http://127.0.0.1:{self.port}"
@@ -80,9 +71,6 @@ class _UvicornInThread:
     def __enter__(self) -> "_UvicornInThread":
         self._thread = threading.Thread(target=self._server.run, daemon=True)
         self._thread.start()
-
-        # Wait for socket to accept connections — bounded so we fail fast
-        # if uvicorn never came up.
         deadline = time.monotonic() + 5.0
         while time.monotonic() < deadline:
             try:
@@ -98,6 +86,59 @@ class _UvicornInThread:
             self._thread.join(timeout=5.0)
 
 
+class _SlowWSMessage:
+    def __init__(self, type: aiohttp.WSMsgType, data: str = "") -> None:
+        self.type = type
+        self.data = data
+
+
+class _SlowWS:
+    """Async iterator that yields WSMessage objects with a deliberate delay
+    between the first and second chunk — simulates a slow upstream that the
+    proxy must NOT buffer before forwarding."""
+
+    def __init__(self, frames: List[_SlowWSMessage], gap_after: int = 1) -> None:
+        self._frames = list(frames)
+        self._gap_after = gap_after
+        self._index = 0
+        self.sent: List[str] = []
+
+    async def send_str(self, text: str) -> None:
+        self.sent.append(text)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self) -> _SlowWSMessage:
+        if self._index >= len(self._frames):
+            raise StopAsyncIteration
+        if self._index == self._gap_after:
+            await asyncio.sleep(_UPSTREAM_GAP_SECONDS)
+        frame = self._frames[self._index]
+        self._index += 1
+        return frame
+
+    async def __aenter__(self) -> "_SlowWS":
+        return self
+
+    async def __aexit__(self, *_) -> None:
+        pass
+
+
+class _SlowSession:
+    def __init__(self, ws: _SlowWS) -> None:
+        self._ws = ws
+
+    def ws_connect(self, *_, **__) -> _SlowWS:
+        return self._ws
+
+    async def __aenter__(self) -> "_SlowSession":
+        return self
+
+    async def __aexit__(self, *_) -> None:
+        pass
+
+
 def _build_app() -> FastAPI:
     app = FastAPI()
     app.include_router(proxy_router)
@@ -106,29 +147,19 @@ def _build_app() -> FastAPI:
 
 
 def _patch_slow_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Replace the proxy's upstream client with one whose MockTransport
-    yields one SSE chunk, sleeps, then yields more."""
-
-    async def slow_content():
-        yield b'event: message_start\ndata: {"role": "assistant"}\n\n'
-        await asyncio.sleep(_UPSTREAM_GAP_SECONDS)
-        yield b'event: content_block_delta\ndata: {"text": "hi"}\n\n'
-        yield b'event: message_stop\ndata: {"stopReason": "end_turn"}\n\n'
-        yield b'event: oauth_required\ndata: {"providerId":"slack"}\n\n'
-        yield b"event: done\ndata: {}\n\n"
-
-    async def handler(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(
-            200,
-            content=slow_content(),
-            headers={"content-type": "text/event-stream"},
-        )
-
-    transport = httpx.MockTransport(handler)
+    frames = [
+        _SlowWSMessage(aiohttp.WSMsgType.TEXT, 'event: message_start\ndata: {"role": "assistant"}\n\n'),
+        # gap inserted before this frame by _SlowWS
+        _SlowWSMessage(aiohttp.WSMsgType.TEXT, 'event: content_block_delta\ndata: {"text": "hi"}\n\n'),
+        _SlowWSMessage(aiohttp.WSMsgType.TEXT, 'event: message_stop\ndata: {"stopReason": "end_turn"}\n\n'),
+        _SlowWSMessage(aiohttp.WSMsgType.TEXT, 'event: oauth_required\ndata: {"providerId":"slack"}\n\n'),
+        _SlowWSMessage(aiohttp.WSMsgType.TEXT, "event: done\ndata: {}\n\n"),
+    ]
+    ws = _SlowWS(frames, gap_after=1)
     monkeypatch.setattr(
         proxy_routes,
-        "_build_upstream_client",
-        lambda: httpx.AsyncClient(transport=transport),
+        "_build_aiohttp_session",
+        lambda _timeout: _SlowSession(ws),
     )
 
 
@@ -136,6 +167,10 @@ def _patch_slow_upstream(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_ttfb_under_200ms_with_x_accel_buffering(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """First byte must arrive well under 200ms even though the upstream
+    introduces a 300ms gap mid-stream. If the proxy buffers, TTFB would
+    equal total stream time (~300ms) rather than the sub-ms cost of
+    relaying a single WebSocket frame."""
     _patch_slow_upstream(monkeypatch)
     app = _build_app()
 
@@ -149,15 +184,13 @@ async def test_ttfb_under_200ms_with_x_accel_buffering(
                 assert response.status_code == 200
                 assert response.headers["x-accel-buffering"] == "no"
                 assert response.headers["cache-control"] == "no-cache"
-                assert response.headers["content-type"].startswith(
-                    "text/event-stream"
-                )
+                assert response.headers["content-type"].startswith("text/event-stream")
                 assert ttfb < _TTFB_BUDGET_SECONDS, (
                     f"TTFB {ttfb:.3f}s exceeded {_TTFB_BUDGET_SECONDS}s budget — "
                     "the proxy is buffering upstream before flushing headers."
                 )
 
-                chunks = []
+                chunks: List[bytes] = []
                 async for chunk in response.aiter_bytes():
                     chunks.append(chunk)
                 body = b"".join(chunks)

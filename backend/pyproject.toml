@@ -23,6 +23,7 @@ dependencies = [
     "python-dotenv==1.2.2",
     "httpx==0.28.1",
     "aiofiles==25.1.0",
+    "websockets==14.0",
 
     # Authentication (for shared auth module)
     "pyjwt[crypto]==2.12.1",

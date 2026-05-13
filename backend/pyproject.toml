@@ -28,7 +28,7 @@ dependencies = [
     "pyjwt[crypto]==2.12.1",
 
     # OAuth provider management
-    "authlib==1.7.0",
+    "authlib==1.7.1",
     "cachetools==6.2.4",
 
     # Security: pin starlette to fix Dependabot alert (transitive via fastapi)

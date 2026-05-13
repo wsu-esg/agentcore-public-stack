@@ -75,6 +75,16 @@ def _bearer_subprotocol(access_token: str) -> str:
     return f"base64UrlBearerAuthorization.{b64.rstrip('=')}"
 
 
+def _build_aiohttp_session(timeout: aiohttp.ClientTimeout) -> aiohttp.ClientSession:
+    """Single seam for upstream aiohttp session construction.
+
+    Tests substitute a mock here without having to patch the global
+    ``aiohttp.ClientSession`` symbol, which would intercept unrelated
+    aiohttp usage in the same process.
+    """
+    return aiohttp.ClientSession(timeout=timeout)
+
+
 async def _relay_chat_stream(
     body: bytes,
     access_token: str,
@@ -124,7 +134,7 @@ async def _relay_chat_stream(
         # handler sets it in BedrockAgentCoreContext before calling invocations.
         config_msg["oauth2_callback_url"] = oauth_callback_url
 
-    async with aiohttp.ClientSession(timeout=timeout) as session:
+    async with _build_aiohttp_session(timeout) as session:
         try:
             async with session.ws_connect(
                 ws_url,

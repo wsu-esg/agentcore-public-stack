@@ -14,6 +14,7 @@ import asyncio
 import json
 import time
 from typing import Callable, List, Optional
+from unittest.mock import MagicMock
 
 import aiohttp
 import pytest
@@ -346,7 +347,13 @@ def test_local_dev_url_uses_authorization_header(monkeypatch: pytest.MonkeyPatch
 def test_upstream_unreachable_yields_stream_error_event(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _patch_session(monkeypatch, _ErrorSession(aiohttp.ClientConnectorError(None, OSError())))
+    # aiohttp.ClientConnectorError.__str__ accesses connection_key.ssl/host/port;
+    # provide a stub so that the proxy's logger.error call does not itself raise.
+    _conn_key = MagicMock()
+    _conn_key.ssl = False
+    _conn_key.host = "upstream"
+    _conn_key.port = 9999
+    _patch_session(monkeypatch, _ErrorSession(aiohttp.ClientConnectorError(_conn_key, OSError("refused"))))
     app = _build_app(record=_record(), user_override=_user())
 
     response = TestClient(app).post("/chat/stream", json={"message": "hi"})
@@ -359,12 +366,15 @@ def test_upstream_unreachable_yields_stream_error_event(
 def test_ws_handshake_rejected_yields_stream_error_event(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    import aiohttp
+    # aiohttp.WSServerHandshakeError.__str__ accesses request_info.real_url;
+    # provide a stub so that the proxy's logger.error call does not itself raise.
+    _request_info = MagicMock()
+    _request_info.real_url = "wss://upstream/ws"
 
     class _BadHandshake(_ErrorSession):
         def ws_connect(self, *_, **__):
             raise aiohttp.WSServerHandshakeError(
-                request_info=None, history=(), status=403
+                request_info=_request_info, history=(), status=403
             )
 
     _patch_session(monkeypatch, _BadHandshake(Exception()))

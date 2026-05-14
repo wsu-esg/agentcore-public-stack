@@ -797,14 +797,14 @@ async def invocations(request: InvocationRequest, current_user: User = Depends(g
                 raise HTTPException(status_code=403, detail=f"Access denied: You do not have permission to access this assistant")
 
         # Log assistant details for debugging
-        logger.info("Assistant loaded successfully!")
-        logger.info("Assistant details retrieved")
-        logger.info("Assistant name retrieved")
-        logger.info("Assistant owner retrieved")
-        logger.info("Assistant visibility retrieved")
-        logger.info("Assistant instructions retrieved")
-        logger.info("Assistant instructions length retrieved")
-        logger.info("Assistant vector index retrieved")
+        logger.info(
+            "Assistant loaded: id=%s name=%s visibility=%s status=%s instructions_len=%d",
+            _sanitize_log(assistant.assistant_id),
+            _sanitize_log(assistant.name),
+            _sanitize_log(assistant.visibility),
+            _sanitize_log(assistant.status),
+            len(assistant.instructions or ""),
+        )
 
         # Mark as viewed if this is a shared assistant (not owned)
         if assistant.owner_id != user_id:
@@ -837,10 +837,17 @@ async def invocations(request: InvocationRequest, current_user: User = Depends(g
             logger.error(f"Exception type: {type(e).__name__}")
             # Continue without RAG context rather than failing
 
-        # 5. Append assistant's instructions to the base system prompt (don't replace)
+        # 5. Build the system prompt for this assistant.
         # For preview sessions, prefer the system_prompt from the request (live form edits)
         # over the saved assistant instructions, so users can test changes before saving.
-        logger.info("Checking assistant instructions...")
+        #
+        # Ordering matters for persona adoption: the assistant's role/instructions come
+        # FIRST so the model anchors its persona on them immediately.  The base system
+        # prompt follows as a "General Guidelines" section that supplies tool-use rules,
+        # formatting preferences, etc.  Placing the assistant instructions last caused the
+        # base prompt's opening "You are an AI assistant…" line to dominate the model's
+        # persona, making the assistant feel like the generic main agent even when
+        # non-empty instructions were present.
         preview_instructions_override = input_data.system_prompt if is_preview_session(input_data.session_id) and input_data.system_prompt else None
         effective_instructions = preview_instructions_override or assistant.instructions
 
@@ -848,31 +855,51 @@ async def invocations(request: InvocationRequest, current_user: User = Depends(g
             # Import here to avoid circular dependency
             from agents.main_agent.core.system_prompt_builder import SystemPromptBuilder
 
-            # Build the base prompt with date
+            # Build the base prompt with date (used as general guidelines below)
             base_prompt_builder = SystemPromptBuilder()
             base_prompt = base_prompt_builder.build(include_date=True)
 
-            # Append assistant instructions to the base prompt
-            system_prompt = f"{base_prompt}\n\n## Assistant-Specific Instructions\n\n{effective_instructions}"
+            # Assistant instructions lead — establishing persona first — followed by
+            # general operational guidelines from the base prompt.
+            system_prompt = (
+                f"{effective_instructions}"
+                f"\n\n---\n\n"
+                f"## General Guidelines\n\n{base_prompt}"
+            )
             if preview_instructions_override:
                 logger.info(
-                    "Using live preview instructions override"
+                    "Assistant %s: using live preview instructions override (len=%d)",
+                    _sanitize_log(input_data.rag_assistant_id),
+                    len(effective_instructions),
                 )
             else:
                 logger.info(
-                    "Appended assistant instructions to base system prompt"
+                    "Assistant %s: built system prompt with assistant instructions first "
+                    "(instructions_len=%d base_len=%d total_len=%d)",
+                    _sanitize_log(input_data.rag_assistant_id),
+                    len(effective_instructions),
+                    len(base_prompt),
+                    len(system_prompt),
                 )
-            logger.info("Final system prompt built")
         else:
-            # No assistant instructions - use base prompt if no system_prompt provided
-            logger.warning("No instructions found on assistant!")
-            if not system_prompt:
-                from agents.main_agent.core.system_prompt_builder import SystemPromptBuilder
-
-                base_prompt_builder = SystemPromptBuilder()
-                system_prompt = base_prompt_builder.build(include_date=True)
-            logger.info(
-                "Assistant has no instructions - using fallback system prompt"
+            # The assistant exists but has no instructions — this almost always
+            # means it was created as a draft and the instructions field was never
+            # filled in.  Surface the problem as a 422 so the user sees it in the
+            # UI rather than silently getting the generic base-prompt response.
+            logger.warning(
+                "Assistant %s ('%s') has no instructions (instructions='%s'). "
+                "The assistant was likely saved as a draft without instructions. "
+                "The user must edit the assistant and add instructions before chatting.",
+                _sanitize_log(input_data.rag_assistant_id),
+                _sanitize_log(assistant.name),
+                repr(assistant.instructions),
+            )
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=(
+                    f"Assistant \"{assistant.name}\" has no instructions configured. "
+                    "Please edit the assistant and add instructions before starting a conversation."
+                ),
             )
 
         # 6. Save assistant_id to session preferences (persist for future loads)

@@ -27,6 +27,7 @@ from fastapi.responses import StreamingResponse
 
 from apis.shared.auth.dependencies import get_current_user_from_session
 from apis.shared.auth.models import User
+from apis.shared.sessions.metadata import get_session_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -177,11 +178,65 @@ async def chat_stream(
     request: Request,
     current_user: User = Depends(get_current_user_from_session),
 ):
-    """Relay the browser's SSE chat request to inference-api via AgentCore Runtime WebSocket."""
+    """Relay the browser's SSE chat request to inference-api via AgentCore Runtime WebSocket.
+
+    Before forwarding, resolves ``rag_assistant_id`` from session preferences
+    when the client omits it.  This closes a race condition where the frontend
+    sends the first message of a continuing session before the self-heal
+    redirect has had time to restore ``?assistantId=`` into the URL, resulting
+    in a request body with no ``rag_assistant_id`` even though the session was
+    originally started with an assistant.
+    """
     body = await request.body()
     # Forward OAuth2CallbackUrl so the container can set it in
     # BedrockAgentCoreContext for MCP OAuth consent flows.
     oauth_callback_url = request.headers.get("OAuth2CallbackUrl")
+
+    # ------------------------------------------------------------------
+    # Assistant-ID resolution
+    #
+    # Parse the body to check whether the client supplied rag_assistant_id.
+    # If it didn't — which happens when the frontend sends the first message
+    # of a continuing session before the URL self-heal redirect has fired —
+    # fall back to the assistant_id stored in the session's preferences.
+    # This ensures the correct assistant persona is always applied.
+    # ------------------------------------------------------------------
+    try:
+        body_dict = json.loads(body)
+    except Exception:
+        # Malformed JSON — let _relay_chat_stream emit the stream_error.
+        body_dict = None
+
+    if body_dict is not None and not body_dict.get("rag_assistant_id"):
+        session_id = body_dict.get("session_id")
+        if session_id:
+            try:
+                session_meta = await get_session_metadata(
+                    session_id=session_id,
+                    user_id=current_user.user_id,
+                )
+                stored_assistant_id = (
+                    session_meta.preferences.assistant_id
+                    if session_meta and session_meta.preferences
+                    else None
+                )
+                if stored_assistant_id:
+                    body_dict["rag_assistant_id"] = stored_assistant_id
+                    body = json.dumps(body_dict).encode()
+                    logger.info(
+                        "Resolved rag_assistant_id=%s from session preferences for session=%s",
+                        stored_assistant_id,
+                        session_id,
+                    )
+            except Exception:
+                # Non-fatal: if the metadata lookup fails (e.g. table not
+                # configured in local dev), continue without the assistant ID
+                # rather than blocking the request.
+                logger.debug(
+                    "Could not resolve assistant_id from session preferences for session=%s",
+                    session_id,
+                    exc_info=True,
+                )
 
     return StreamingResponse(
         _relay_chat_stream(body, current_user.raw_token, oauth_callback_url),

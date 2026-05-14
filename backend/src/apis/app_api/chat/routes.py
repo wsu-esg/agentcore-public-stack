@@ -281,27 +281,54 @@ async def chat_agent_stream(request: ChatRequest, current_user: User = Depends(g
             logger.error(f"❌ Error searching assistant knowledge base: {e}", exc_info=True)
             # Continue without RAG context rather than failing
 
-        # 5. Append assistant's instructions to the base system prompt (don't replace)
+        # 5. Build the system prompt for this assistant.
+        #
+        # Ordering matters for persona adoption: the assistant's role/instructions come
+        # FIRST so the model anchors its persona on them immediately.  The base system
+        # prompt follows as a "General Guidelines" section after a horizontal rule.
+        #
+        # Placing the assistant instructions last caused the base prompt's opening
+        # "You are an AI assistant…" line to dominate the model's persona, making the
+        # assistant feel like the generic main agent even when non-empty instructions
+        # were present.
         if assistant.instructions:
             from agents.main_agent.core.system_prompt_builder import SystemPromptBuilder
 
-            # Build the base prompt with date
             base_prompt_builder = SystemPromptBuilder()
             base_prompt = base_prompt_builder.build(include_date=True)
 
-            # Append assistant instructions to the base prompt
-            system_prompt = f"{base_prompt}\n\n## Assistant-Specific Instructions\n\n{assistant.instructions}"
+            # Assistant instructions lead — establishing persona first — followed by
+            # general operational guidelines from the base prompt.
+            system_prompt = (
+                f"{assistant.instructions}"
+                f"\n\n---\n\n"
+                f"## General Guidelines\n\n{base_prompt}"
+            )
             logger.info(
-                f"✅ Appended assistant instructions to base system prompt (base: {len(base_prompt)}, assistant: {len(assistant.instructions)}, total: {len(system_prompt)})"
+                "Assistant %s: built system prompt with assistant instructions first "
+                "(instructions_len=%d base_len=%d total_len=%d)",
+                assistant_id_to_use,
+                len(assistant.instructions),
+                len(base_prompt),
+                len(system_prompt),
             )
         else:
-            # No assistant instructions - use base prompt if no system_prompt provided
-            if not system_prompt:
-                from agents.main_agent.core.system_prompt_builder import SystemPromptBuilder
-
-                base_prompt_builder = SystemPromptBuilder()
-                system_prompt = base_prompt_builder.build(include_date=True)
-            logger.info(f"⚠️ Assistant {assistant_id_to_use} has no instructions - using {'provided' if system_prompt else 'default'} system prompt")
+            # The assistant exists but has no instructions — this almost always
+            # means it was created as a draft and instructions were never filled in.
+            # Surface the problem rather than silently using the generic base prompt.
+            logger.warning(
+                f"Assistant {assistant_id_to_use} ('{assistant.name}') has no instructions "
+                f"(instructions={repr(assistant.instructions)}). "
+                "The assistant was likely saved as a draft without instructions. "
+                "User must edit the assistant and add instructions before chatting."
+            )
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Assistant \"{assistant.name}\" has no instructions configured. "
+                    "Please edit the assistant and add instructions before starting a conversation."
+                ),
+            )
 
         # 6. Save assistant_id to session preferences (persist for future loads)
         # Only save if it came from the request (not already persisted)

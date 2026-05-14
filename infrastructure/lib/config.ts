@@ -70,6 +70,12 @@ export interface InferenceApiConfig {
   // Environment variables for runtime container
   logLevel: string;
   additionalCorsOrigins?: string; // Extra CORS origins to append (comma-separated)
+  // SSM parameter path for a custom agent system prompt (OPTIONAL).
+  // When set, AGENT_SYSTEM_PROMPT is injected into the container from SSM so the
+  // prompt can be updated without a CDK redeploy. When absent the container falls
+  // back to the built-in DEFAULT_SYSTEM_PROMPT in system_prompt_builder.py.
+  // Set via CDK_INFERENCE_API_AGENT_SYSTEM_PROMPT_SSM_PATH before deploying.
+  agentSystemPromptSsmPath?: string;
 }
 
 export interface GatewayConfig {
@@ -226,6 +232,7 @@ export function loadConfig(scope: cdk.App): AppConfig {
       // Environment variables from GitHub Secrets/Variables with context fallback
       logLevel: process.env.ENV_INFERENCE_API_LOG_LEVEL || scope.node.tryGetContext('inferenceApi')?.logLevel,
       additionalCorsOrigins: process.env.CDK_INFERENCE_API_CORS_ORIGINS || scope.node.tryGetContext('inferenceApi')?.additionalCorsOrigins,
+      agentSystemPromptSsmPath: process.env.CDK_INFERENCE_API_AGENT_SYSTEM_PROMPT_SSM_PATH || scope.node.tryGetContext('inferenceApi')?.agentSystemPromptSsmPath,
     },
     gateway: {
       enabled: parseBooleanEnv(process.env.CDK_GATEWAY_ENABLED) ?? scope.node.tryGetContext('gateway')?.enabled,

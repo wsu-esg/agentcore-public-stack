@@ -1054,6 +1054,26 @@ export class InferenceApiStack extends cdk.Stack {
           this,
           `/${config.projectPrefix}/oauth/platform-workload-identity-name`
         ),
+
+        // Custom agent system prompt (OPTIONAL).
+        // Stored in SSM so the prompt can be updated without a CDK redeploy.
+        // Set CDK_INFERENCE_API_AGENT_SYSTEM_PROMPT_SSM_PATH to the SSM parameter
+        // path before deploying, e.g.:
+        //   CDK_INFERENCE_API_AGENT_SYSTEM_PROMPT_SSM_PATH=/<projectPrefix>/inference-api/agent-system-prompt
+        // Create the parameter first:
+        //   aws ssm put-parameter \
+        //     --name "/<projectPrefix>/inference-api/agent-system-prompt" \
+        //     --value "You are ..." \
+        //     --type String
+        // Omit the env var to fall back to the built-in default prompt.
+        ...(config.inferenceApi.agentSystemPromptSsmPath
+          ? {
+              AGENT_SYSTEM_PROMPT: ssm.StringParameter.valueForStringParameter(
+                this,
+                config.inferenceApi.agentSystemPromptSsmPath,
+              ),
+            }
+          : {}),
       },
     });
     this.runtime.node.addDependency(runtimeExecutionRole);

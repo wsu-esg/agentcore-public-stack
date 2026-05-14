@@ -838,69 +838,78 @@ async def invocations(request: InvocationRequest, current_user: User = Depends(g
             # Continue without RAG context rather than failing
 
         # 5. Build the system prompt for this assistant.
-        # For preview sessions, prefer the system_prompt from the request (live form edits)
-        # over the saved assistant instructions, so users can test changes before saving.
         #
-        # Ordering matters for persona adoption: the assistant's role/instructions come
-        # FIRST so the model anchors its persona on them immediately.  The base system
-        # prompt follows as a "General Guidelines" section that supplies tool-use rules,
-        # formatting preferences, etc.  Placing the assistant instructions last caused the
-        # base prompt's opening "You are an AI assistant…" line to dominate the model's
-        # persona, making the assistant feel like the generic main agent even when
-        # non-empty instructions were present.
-        preview_instructions_override = input_data.system_prompt if is_preview_session(input_data.session_id) and input_data.system_prompt else None
-        effective_instructions = preview_instructions_override or assistant.instructions
-
-        if effective_instructions:
-            # Import here to avoid circular dependency
-            from agents.main_agent.core.system_prompt_builder import SystemPromptBuilder
-
-            # Build the base prompt with date (used as general guidelines below)
-            base_prompt_builder = SystemPromptBuilder()
-            base_prompt = base_prompt_builder.build(include_date=True)
-
-            # Assistant instructions lead — establishing persona first — followed by
-            # general operational guidelines from the base prompt.
-            system_prompt = (
-                f"{effective_instructions}"
-                f"\n\n---\n\n"
-                f"## General Guidelines\n\n{base_prompt}"
-            )
-            if preview_instructions_override:
-                logger.info(
-                    "Assistant %s: using live preview instructions override (len=%d)",
-                    _sanitize_log(input_data.rag_assistant_id),
-                    len(effective_instructions),
-                )
-            else:
-                logger.info(
-                    "Assistant %s: built system prompt with assistant instructions first "
-                    "(instructions_len=%d base_len=%d total_len=%d)",
-                    _sanitize_log(input_data.rag_assistant_id),
-                    len(effective_instructions),
-                    len(base_prompt),
-                    len(system_prompt),
-                )
-        else:
-            # The assistant exists but has no instructions — this almost always
-            # means it was created as a draft and the instructions field was never
-            # filled in.  Surface the problem as a 422 so the user sees it in the
-            # UI rather than silently getting the generic base-prompt response.
-            logger.warning(
-                "Assistant %s ('%s') has no instructions (instructions='%s'). "
-                "The assistant was likely saved as a draft without instructions. "
-                "The user must edit the assistant and add instructions before chatting.",
+        # The BFF proxy (app_api/chat/proxy_routes.py) pre-builds the system
+        # prompt and sends it as ``input_data.system_prompt``.  When that value
+        # is already present we trust it and skip the rebuild here to avoid
+        # duplicate DynamoDB + SSM work.  We still fall through to steps 6+
+        # (preferences persistence, spreadsheet tool scoping) because those
+        # depend on ``rag_assistant_id`` being in the request.
+        #
+        # For preview sessions the live instructions from the form always win
+        # (the BFF skips system_prompt injection when system_prompt is already
+        # set, so this branch only fires for in-browser previews).
+        if input_data.system_prompt and not is_preview_session(input_data.session_id):
+            # BFF already built and validated the prompt — use it directly.
+            system_prompt = input_data.system_prompt
+            logger.info(
+                "Assistant %s: using BFF-pre-built system_prompt (len=%d)",
                 _sanitize_log(input_data.rag_assistant_id),
-                _sanitize_log(assistant.name),
-                repr(assistant.instructions),
+                len(system_prompt),
             )
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=(
-                    f"Assistant \"{assistant.name}\" has no instructions configured. "
-                    "Please edit the assistant and add instructions before starting a conversation."
-                ),
+        else:
+            # No pre-built prompt: build it here.  This covers:
+            #   • Preview sessions (live form edits override saved instructions)
+            #   • Direct inference-api callers that bypass the BFF
+            preview_instructions_override = (
+                input_data.system_prompt
+                if is_preview_session(input_data.session_id) and input_data.system_prompt
+                else None
             )
+            effective_instructions = preview_instructions_override or assistant.instructions
+
+            if effective_instructions:
+                from agents.main_agent.core.system_prompt_builder import SystemPromptBuilder
+
+                base_prompt = SystemPromptBuilder().build(include_date=True)
+
+                system_prompt = (
+                    f"{effective_instructions}"
+                    f"\n\n---\n\n"
+                    f"## General Guidelines\n\n{base_prompt}"
+                )
+                if preview_instructions_override:
+                    logger.info(
+                        "Assistant %s: using live preview instructions override (len=%d)",
+                        _sanitize_log(input_data.rag_assistant_id),
+                        len(effective_instructions),
+                    )
+                else:
+                    logger.info(
+                        "Assistant %s: built system prompt with assistant instructions first "
+                        "(instructions_len=%d base_len=%d total_len=%d)",
+                        _sanitize_log(input_data.rag_assistant_id),
+                        len(effective_instructions),
+                        len(base_prompt),
+                        len(system_prompt),
+                    )
+            else:
+                # The assistant exists but has no instructions.
+                logger.warning(
+                    "Assistant %s ('%s') has no instructions (instructions='%s'). "
+                    "The assistant was likely saved as a draft without instructions. "
+                    "The user must edit the assistant and add instructions before chatting.",
+                    _sanitize_log(input_data.rag_assistant_id),
+                    _sanitize_log(assistant.name),
+                    repr(assistant.instructions),
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=(
+                        f"Assistant \"{assistant.name}\" has no instructions configured. "
+                        "Please edit the assistant and add instructions before starting a conversation."
+                    ),
+                )
 
         # 6. Save assistant_id to session preferences (persist for future loads)
         # Skip persistence for preview sessions

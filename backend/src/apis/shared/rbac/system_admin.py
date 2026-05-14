@@ -6,13 +6,13 @@ from typing import Callable
 from fastapi import Depends, HTTPException, status
 
 from apis.shared.auth.models import User
-from apis.shared.auth.dependencies import get_current_user
+from apis.shared.auth.dependencies import get_current_user_from_session
 
 logger = logging.getLogger(__name__)
 
 
 async def require_system_admin(
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_user_from_session),
 ) -> User:
     """
     Require system administrator access.

@@ -1,17 +1,22 @@
 """
 System prompt construction for agent.
 
-The active default prompt is resolved at import time:
+The active default prompt is resolved on first use (then cached for the
+lifetime of the process) using the following priority order:
 
-1. ``AGENT_SYSTEM_PROMPT`` env var — operators set this to inject a fully
-   custom prompt without modifying source code (recommended for all
-   deployments).
-2. ``DEFAULT_SYSTEM_PROMPT`` — the generic fallback used when the env var
-   is absent. It contains no organisation-specific language and is safe to
-   ship as-is in the public repository.
+1. ``AGENT_SYSTEM_PROMPT_SSM_PATH`` env var — path to an SSM Parameter
+   Store entry containing the prompt.  The container fetches the value at
+   startup via boto3, so the prompt can be updated with
+   ``aws ssm put-parameter --overwrite`` + a container restart without any
+   CDK redeploy.  Recommended for cloud deployments.
+2. ``AGENT_SYSTEM_PROMPT`` env var — the raw prompt text.  Convenient for
+   local development where SSM is not available.
+3. ``DEFAULT_SYSTEM_PROMPT`` — the generic fallback.  Contains no
+   organisation-specific language and is safe to ship as-is.
 """
 import logging
 import os
+from functools import lru_cache
 from typing import Optional
 
 from agents.main_agent.utils.timezone import get_current_date_pacific
@@ -103,17 +108,50 @@ Your goal is to be helpful, accurate, and efficient in completing user \
 requests using the available tools."""
 
 
+@lru_cache(maxsize=1)
+def _fetch_from_ssm(ssm_path: str) -> str:
+    """Fetch the system prompt from SSM Parameter Store and cache the result.
+
+    The ``@lru_cache`` ensures the SSM API is called exactly once per process
+    lifetime.  To pick up a prompt change, update the SSM parameter and
+    restart the container — no CDK redeploy required.
+
+    Falls back to ``DEFAULT_SYSTEM_PROMPT`` if the SSM call fails, so a
+    misconfigured path degrades gracefully rather than crashing the agent.
+    """
+    try:
+        import boto3
+
+        region = os.environ.get("AWS_DEFAULT_REGION") or os.environ.get("AWS_REGION")
+        ssm = boto3.client("ssm", region_name=region)
+        response = ssm.get_parameter(Name=ssm_path, WithDecryption=False)
+        prompt = response["Parameter"]["Value"].strip()
+        if prompt:
+            logger.info("Loaded system prompt from SSM parameter: %s", ssm_path)
+            return prompt
+        logger.warning("SSM parameter %s exists but is empty, using default prompt", ssm_path)
+    except Exception:
+        logger.exception("Failed to fetch system prompt from SSM path %r, using default", ssm_path)
+    return DEFAULT_SYSTEM_PROMPT
+
+
 def _resolve_default_prompt() -> str:
     """Return the prompt to use when no caller-supplied prompt is provided.
 
-    Checks ``AGENT_SYSTEM_PROMPT`` first so operators can inject a custom
-    prompt via environment variable without touching source code. Falls back
-    to ``DEFAULT_SYSTEM_PROMPT`` when the variable is absent or empty.
+    Resolution order:
+    1. AGENT_SYSTEM_PROMPT_SSM_PATH — live SSM lookup (cloud deployments)
+    2. AGENT_SYSTEM_PROMPT          — raw value in env (local dev)
+    3. DEFAULT_SYSTEM_PROMPT        — built-in fallback
     """
+    ssm_path = os.environ.get("AGENT_SYSTEM_PROMPT_SSM_PATH", "").strip()
+    if ssm_path:
+        return _fetch_from_ssm(ssm_path)
+
     env_prompt = os.environ.get("AGENT_SYSTEM_PROMPT", "").strip()
     if env_prompt:
         logger.info("Using AGENT_SYSTEM_PROMPT from environment")
         return env_prompt
+
     return DEFAULT_SYSTEM_PROMPT
 
 

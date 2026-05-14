@@ -28,6 +28,7 @@ from fastapi.responses import StreamingResponse
 from apis.shared.auth.dependencies import get_current_user_from_session
 from apis.shared.auth.models import User
 from apis.shared.sessions.metadata import get_session_metadata
+from apis.shared.assistants.service import get_assistant_with_access_check
 
 logger = logging.getLogger(__name__)
 
@@ -174,69 +175,161 @@ async def _relay_chat_stream(
             yield "event: done\ndata: {}\n\n"
 
 
+async def _resolve_assistant_system_prompt(
+    body_dict: dict,
+    user_id: str,
+    user_email: str,
+) -> dict:
+    """Resolve the assistant and pre-build the system prompt in the BFF layer.
+
+    This is the authoritative place where assistant instructions are turned
+    into a system prompt.  Doing it here rather than inside inference-api
+    means the logic runs in app-api — which has always owned the assistants
+    DynamoDB table — and the assistant ID reaches inference-api regardless of
+    any frontend timing issues.
+
+    Resolution order for the assistant ID:
+    1. ``rag_assistant_id`` already in the request body (frontend URL param).
+    2. ``preferences.assistant_id`` stored in session metadata (fallback for
+       continuing sessions opened from the sidebar before the Angular
+       self-heal redirect fires).
+
+    If ``interrupt_responses`` is set (OAuth resume turn) we skip: the
+    snapshot's system_prompt is used by inference-api directly.
+
+    Returns a (possibly mutated) copy of ``body_dict``.  The original dict
+    is mutated in-place; callers must re-serialise to bytes afterwards.
+    """
+    # Resume turns reuse the paused snapshot — skip assistant resolution.
+    if body_dict.get("interrupt_responses"):
+        return body_dict
+
+    # Already has a system_prompt set (e.g. preview mode) — don't overwrite.
+    if body_dict.get("system_prompt"):
+        return body_dict
+
+    assistant_id: str | None = body_dict.get("rag_assistant_id")
+    session_id: str | None = body_dict.get("session_id")
+
+    # --- Step 1: fall back to session preferences when the frontend omitted it ---
+    if not assistant_id and session_id:
+        try:
+            session_meta = await get_session_metadata(
+                session_id=session_id,
+                user_id=user_id,
+            )
+            assistant_id = (
+                session_meta.preferences.assistant_id
+                if session_meta and session_meta.preferences
+                else None
+            )
+            if assistant_id:
+                body_dict["rag_assistant_id"] = assistant_id
+                logger.info(
+                    "BFF resolved rag_assistant_id=%s from session preferences (session=%s)",
+                    assistant_id,
+                    session_id,
+                )
+        except Exception:
+            logger.debug(
+                "BFF could not look up session preferences for session=%s",
+                session_id,
+                exc_info=True,
+            )
+
+    if not assistant_id:
+        # No assistant attached to this request — use the default agent.
+        return body_dict
+
+    # --- Step 2: load assistant and build system prompt ---
+    try:
+        assistant = await get_assistant_with_access_check(
+            assistant_id=assistant_id,
+            user_id=user_id,
+            user_email=user_email,
+        )
+    except Exception:
+        logger.warning(
+            "BFF could not load assistant=%s — forwarding without system_prompt",
+            assistant_id,
+            exc_info=True,
+        )
+        return body_dict
+
+    if not assistant:
+        logger.warning(
+            "BFF: assistant=%s not found or access denied — forwarding without system_prompt",
+            assistant_id,
+        )
+        return body_dict
+
+    if not assistant.instructions:
+        # Empty instructions — inference-api will surface the 422 with the
+        # helpful "Please edit the assistant" message.
+        logger.warning(
+            "BFF: assistant=%s ('%s') has no instructions — deferring 422 to inference-api",
+            assistant_id,
+            assistant.name,
+        )
+        return body_dict
+
+    # Build the system prompt: assistant instructions first (establishes
+    # persona), followed by the base prompt's general guidelines.
+    # Lazy import to keep module-level deps minimal.
+    from agents.main_agent.core.system_prompt_builder import SystemPromptBuilder
+
+    base_prompt = SystemPromptBuilder().build(include_date=True)
+    system_prompt = (
+        f"{assistant.instructions}"
+        f"\n\n---\n\n"
+        f"## General Guidelines\n\n{base_prompt}"
+    )
+    body_dict["system_prompt"] = system_prompt
+    logger.info(
+        "BFF built system_prompt for assistant=%s '%s' "
+        "(instructions_len=%d base_len=%d total_len=%d)",
+        assistant_id,
+        assistant.name,
+        len(assistant.instructions),
+        len(base_prompt),
+        len(system_prompt),
+    )
+    return body_dict
+
+
 async def chat_stream(
     request: Request,
     current_user: User = Depends(get_current_user_from_session),
 ):
     """Relay the browser's SSE chat request to inference-api via AgentCore Runtime WebSocket.
 
-    Before forwarding, resolves ``rag_assistant_id`` from session preferences
-    when the client omits it.  This closes a race condition where the frontend
-    sends the first message of a continuing session before the self-heal
-    redirect has had time to restore ``?assistantId=`` into the URL, resulting
-    in a request body with no ``rag_assistant_id`` even though the session was
-    originally started with an assistant.
+    Before forwarding the request the BFF resolves the assistant (if any) and
+    builds the system prompt here in app-api.  This means:
+
+    * The correct assistant persona is applied even when the frontend omits
+      ``rag_assistant_id`` (race condition on sidebar-opened sessions).
+    * Assistant loading lives in app-api — the service that owns the assistants
+      table — rather than being buried inside the inference-api container.
+    * inference-api still receives ``rag_assistant_id`` so it can perform RAG
+      augmentation, persist the assistant to session preferences, and scope
+      spreadsheet tools to the assistant's corpus.
     """
     body = await request.body()
-    # Forward OAuth2CallbackUrl so the container can set it in
-    # BedrockAgentCoreContext for MCP OAuth consent flows.
     oauth_callback_url = request.headers.get("OAuth2CallbackUrl")
 
-    # ------------------------------------------------------------------
-    # Assistant-ID resolution
-    #
-    # Parse the body to check whether the client supplied rag_assistant_id.
-    # If it didn't — which happens when the frontend sends the first message
-    # of a continuing session before the URL self-heal redirect has fired —
-    # fall back to the assistant_id stored in the session's preferences.
-    # This ensures the correct assistant persona is always applied.
-    # ------------------------------------------------------------------
     try:
         body_dict = json.loads(body)
     except Exception:
-        # Malformed JSON — let _relay_chat_stream emit the stream_error.
+        # Malformed JSON — pass through; _relay_chat_stream will emit the error.
         body_dict = None
 
-    if body_dict is not None and not body_dict.get("rag_assistant_id"):
-        session_id = body_dict.get("session_id")
-        if session_id:
-            try:
-                session_meta = await get_session_metadata(
-                    session_id=session_id,
-                    user_id=current_user.user_id,
-                )
-                stored_assistant_id = (
-                    session_meta.preferences.assistant_id
-                    if session_meta and session_meta.preferences
-                    else None
-                )
-                if stored_assistant_id:
-                    body_dict["rag_assistant_id"] = stored_assistant_id
-                    body = json.dumps(body_dict).encode()
-                    logger.info(
-                        "Resolved rag_assistant_id=%s from session preferences for session=%s",
-                        stored_assistant_id,
-                        session_id,
-                    )
-            except Exception:
-                # Non-fatal: if the metadata lookup fails (e.g. table not
-                # configured in local dev), continue without the assistant ID
-                # rather than blocking the request.
-                logger.debug(
-                    "Could not resolve assistant_id from session preferences for session=%s",
-                    session_id,
-                    exc_info=True,
-                )
+    if body_dict is not None:
+        body_dict = await _resolve_assistant_system_prompt(
+            body_dict=body_dict,
+            user_id=current_user.user_id,
+            user_email=current_user.email,
+        )
+        body = json.dumps(body_dict).encode()
 
     return StreamingResponse(
         _relay_chat_stream(body, current_user.raw_token, oauth_callback_url),

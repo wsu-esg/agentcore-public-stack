@@ -1021,6 +1021,11 @@ export class InferenceApiStack extends cdk.Stack {
           `/${config.projectPrefix}/rag/documents-bucket-name`
         ),
 
+        // AgentCore Gateway — SSM path read by get_gateway_url_from_ssm() at runtime.
+        // The gateway stack writes the URL to this parameter after deployment.
+        AGENTCORE_GATEWAY_SSM_PATH: `/${config.projectPrefix}/gateway/url`,
+        AGENTCORE_GATEWAY_MCP_ENABLED: 'true',
+
         // Authentication
         ENABLE_AUTHENTICATION: 'true',
         ENABLE_QUOTA_ENFORCEMENT: 'true',

@@ -631,7 +631,7 @@ class ToolCreateRequest(BaseModel):
     """Request body for POST /api/admin/tools."""
 
     tool_id: str = Field(
-        ..., pattern=r"^[a-z][a-z0-9_]{2,49}$", alias="toolId"
+        ..., pattern=r"^[a-z][a-z0-9_-]{2,49}$", alias="toolId"
     )
     display_name: str = Field(
         ..., min_length=1, max_length=100, alias="displayName"
@@ -888,5 +888,3 @@ class MCPDiscoverResponse(BaseModel):
     """Response body for POST /api/admin/tools/discover."""
 
     tools: List[DiscoveredMCPTool]
-
-

@@ -85,7 +85,7 @@ import {
               />
               @if (form.get('toolId')?.invalid && form.get('toolId')?.touched) {
                 <p class="mt-1 text-sm text-red-600 dark:text-red-400">
-                  Tool ID must be 3-50 characters, lowercase letters, numbers, and underscores only.
+                  Tool ID must be 3-50 characters, lowercase letters, numbers, underscores, and hyphens only.
                 </p>
               }
             </div>
@@ -650,7 +650,7 @@ export class ToolFormPage implements OnInit {
   readonly oauthProviders = computed(() => this.connectorsService.getEnabledConnectors());
 
   form: FormGroup = this.fb.group({
-    toolId: ['', [Validators.required, Validators.pattern(/^[a-z][a-z0-9_]{2,49}$/)]],
+    toolId: ['', [Validators.required, Validators.pattern(/^[a-z][a-z0-9_-]{2,49}$/)]],
     displayName: ['', [Validators.required, Validators.minLength(1), Validators.maxLength(100)]],
     description: ['', [Validators.required, Validators.maxLength(500)]],
     category: ['utility'],

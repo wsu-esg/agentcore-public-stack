@@ -29,8 +29,20 @@ export class UserService {
       return null;
     }
     const fullName = sessionUser.name?.trim() || sessionUser.email || '';
-    const [firstName = '', ...rest] = fullName.split(' ');
-    const lastName = rest.join(' ');
+
+    // Handle "LastName, FirstName" format common in enterprise directories
+    // (e.g. Okta `name` claim formatted as "Dudra, Bradley").
+    let firstName: string;
+    let lastName: string;
+    if (fullName.includes(',')) {
+      const commaIdx = fullName.indexOf(',');
+      lastName = fullName.slice(0, commaIdx).trim();
+      firstName = fullName.slice(commaIdx + 1).trim().split(' ')[0] ?? '';
+    } else {
+      const [first = '', ...rest] = fullName.split(' ');
+      firstName = first;
+      lastName = rest.join(' ');
+    }
     return {
       email: sessionUser.email,
       user_id: sessionUser.user_id || sessionUser.email,

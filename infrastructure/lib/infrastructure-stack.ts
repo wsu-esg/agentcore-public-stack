@@ -1332,6 +1332,20 @@ export class InfrastructureStack extends cdk.Stack {
         .map((name) => cognito.UserPoolClientIdentityProvider.custom(name)),
     ];
 
+    // Declare which attributes the App Client can read from the user profile.
+    // Custom attributes must be listed here or Cognito omits them from the ID
+    // token — even when they are correctly written by an IdP attribute mapping.
+    const bffReadAttributes = new cognito.ClientAttributes()
+      .withStandardAttributes({
+        email: true,
+        emailVerified: true,
+        fullname: true,
+        givenName: true,
+        familyName: true,
+        profilePicture: true,
+      })
+      .withCustomAttributes('roles', 'provider_sub');
+
     const bffAppClient = userPool.addClient('CognitoBFFAppClient', {
       userPoolClientName: getResourceName(config, 'bff-app-client'),
       generateSecret: true,
@@ -1348,6 +1362,7 @@ export class InfrastructureStack extends cdk.Stack {
       },
       preventUserExistenceErrors: true,
       supportedIdentityProviders: bffSupportedIdentityProviders,
+      readAttributes: bffReadAttributes,
     });
 
     // Persist the generated client secret in Secrets Manager so app-api can

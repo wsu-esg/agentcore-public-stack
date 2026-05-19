@@ -8,6 +8,7 @@ import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
 import * as ecs from 'aws-cdk-lib/aws-ecs';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as kms from 'aws-cdk-lib/aws-kms';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as route53 from 'aws-cdk-lib/aws-route53';
 import * as route53Targets from 'aws-cdk-lib/aws-route53-targets';
 import * as s3 from 'aws-cdk-lib/aws-s3';
@@ -1274,6 +1275,18 @@ export class InfrastructureStack extends cdk.Stack {
     // Self-signup is enabled initially for first-boot; the App API
     // disables it after the first admin user is created.
 
+    // Pre-Token Generation Lambda — injects custom:roles from the user profile
+    // into the ID token before Cognito issues it. This avoids having to change
+    // App Client readAttributes (which breaks OAuth flows when set explicitly).
+    const preTokenGenLambda = new lambda.Function(this, 'PreTokenGenerationLambda', {
+      functionName: getResourceName(config, 'cognito-pre-token-gen'),
+      runtime: lambda.Runtime.PYTHON_3_13,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('lambda/cognito-pre-token-generation'),
+      timeout: cdk.Duration.seconds(5),
+      description: 'Cognito Pre-Token Generation trigger: injects custom:roles into ID token',
+    });
+
     const userPool = new cognito.UserPool(this, 'CognitoUserPool', {
       userPoolName: getResourceName(config, 'user-pool'),
       selfSignUpEnabled: true,
@@ -1297,6 +1310,9 @@ export class InfrastructureStack extends cdk.Stack {
       },
       accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
       removalPolicy: getRemovalPolicy(config),
+      lambdaTriggers: {
+        preTokenGeneration: preTokenGenLambda,
+      },
     });
 
     // BFF App Client — confidential client used by app-api for the
@@ -1332,20 +1348,6 @@ export class InfrastructureStack extends cdk.Stack {
         .map((name) => cognito.UserPoolClientIdentityProvider.custom(name)),
     ];
 
-    // Declare which attributes the App Client can read from the user profile.
-    // Custom attributes must be listed here or Cognito omits them from the ID
-    // token — even when they are correctly written by an IdP attribute mapping.
-    const bffReadAttributes = new cognito.ClientAttributes()
-      .withStandardAttributes({
-        email: true,
-        emailVerified: true,
-        fullname: true,
-        givenName: true,
-        familyName: true,
-        profilePicture: true,
-      })
-      .withCustomAttributes('roles', 'provider_sub');
-
     const bffAppClient = userPool.addClient('CognitoBFFAppClient', {
       userPoolClientName: getResourceName(config, 'bff-app-client'),
       generateSecret: true,
@@ -1362,7 +1364,6 @@ export class InfrastructureStack extends cdk.Stack {
       },
       preventUserExistenceErrors: true,
       supportedIdentityProviders: bffSupportedIdentityProviders,
-      readAttributes: bffReadAttributes,
     });
 
     // Persist the generated client secret in Secrets Manager so app-api can

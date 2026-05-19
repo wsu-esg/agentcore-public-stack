@@ -60,10 +60,23 @@ class CognitoJWTValidator:
             # Extract roles from cognito:groups (list) or custom:roles (comma-separated string)
             roles = self._extract_roles(payload)
 
+            # Prefer given_name + family_name; fall back to composite name claim
+            given_name = (payload.get("given_name") or "").strip()
+            family_name = (payload.get("family_name") or "").strip()
+            if given_name or family_name:
+                resolved_name = f"{given_name} {family_name}".strip()
+            else:
+                resolved_name = (
+                    payload.get("name")
+                    or payload.get("cognito:username")
+                    or payload.get("username")
+                    or ""
+                )
+
             return User(
                 user_id=payload["sub"],
                 email=payload.get("email") or "",
-                name=payload.get("name") or payload.get("cognito:username") or payload.get("username") or "",
+                name=resolved_name,
                 roles=roles,
                 picture=payload.get("picture"),
             )

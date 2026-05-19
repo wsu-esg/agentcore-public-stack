@@ -168,15 +168,23 @@ def decode_id_token_claims(id_token: str) -> IdTokenClaims:
     if not sub or not username:
         raise TokenExchangeError("ID token missing required identity claims")
 
+    # Prefer given_name + family_name over the composite `name` claim.
+    # Enterprise IdPs (e.g. Okta, Entra) often populate `name` with just the
+    # surname or in "LastName, FirstName" order, while given_name/family_name
+    # are the reliable canonical fields. If neither structured field is
+    # present, fall back to the raw `name` claim.
+    given_name = (claims.get("given_name") or "").strip()
+    family_name = (claims.get("family_name") or "").strip()
+    if given_name or family_name:
+        resolved_name = f"{given_name} {family_name}".strip() or None
+    else:
+        resolved_name = (claims.get("name") or "").strip() or None
+
     return IdTokenClaims(
         sub=str(sub),
         username=str(username),
         email=(claims.get("email") or "").lower() or None,
-        name=claims.get("name")
-        or (
-            f"{claims.get('given_name', '')} {claims.get('family_name', '')}".strip()
-            or None
-        ),
+        name=resolved_name,
         picture=claims.get("picture"),
         roles=_extract_roles_from_id_token(claims),
     )

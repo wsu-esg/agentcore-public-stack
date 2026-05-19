@@ -27,7 +27,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from apis.shared.sessions.metadata import get_session_metadata, store_session_metadata
 from apis.shared.sessions.models import SessionMetadata
@@ -551,6 +551,17 @@ async def _handle_ws_chat(websocket: WebSocket, config_msg: dict) -> None:
         await websocket.close(code=4001, reason="Authentication required")
         return
 
+    # Enrich user with stored profile (email, name, IdP roles) from DynamoDB.
+    # _build_user_from_token only reads JWT claims; for federated users the
+    # access token carries the Cognito provider group (e.g.
+    # "us-west-2_Pool_OktaProvider"), NOT the application roles that were
+    # mapped from the IdP and stored in the Users table at /auth/callback.
+    # Without this enrichment, RBAC resolves against the raw Cognito group
+    # and falls back to the default role, denying model access even for
+    # users whose role has the correct model grants.
+    from apis.shared.auth.dependencies import _enrich_user_from_store
+    await _enrich_user_from_store(user)
+
     try:
         invocation_request = InvocationRequest(**body_data)
     except Exception as exc:
@@ -579,22 +590,6 @@ async def _handle_ws_chat(websocket: WebSocket, config_msg: dict) -> None:
             "Chat WS client disconnected: session=%s",
             _sanitize_log(invocation_request.session_id),
         )
-    except HTTPException as exc:
-        # Surface structured HTTP errors (e.g. 422 from empty assistant instructions)
-        # as stream_error SSE events so the browser UI shows the real message.
-        logger.warning(
-            "Chat invocation returned HTTP %d for session=%s: %s",
-            exc.status_code,
-            _sanitize_log(invocation_request.session_id),
-            exc.detail,
-        )
-        try:
-            await websocket.send_text(
-                f"event: stream_error\ndata: {json.dumps({'message': str(exc.detail)})}\n\n"
-            )
-            await websocket.send_text("event: done\ndata: {}\n\n")
-        except Exception:
-            pass
     except Exception as exc:
         logger.error("Chat invocation error in /ws handler: %s", exc, exc_info=True)
         try:

@@ -199,6 +199,11 @@ export const routes: Routes = [
         canActivate: [adminGuard],
     },
     {
+        path: 'admin/branding',
+        loadComponent: () => import('./admin/branding/branding.page').then(m => m.BrandingPage),
+        canActivate: [adminGuard],
+    },
+    {
         path: 'admin/fine-tuning',
         loadComponent: () => import('./admin/fine-tuning-access/fine-tuning-access.page').then(m => m.FineTuningAccessPage),
         canActivate: [adminGuard],

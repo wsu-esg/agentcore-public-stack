@@ -164,6 +164,19 @@ export class AppApiStack extends cdk.Stack {
     // Note: RAG resources (documents bucket, vector bucket, vector index, ingestion Lambda)
     // are created in RagIngestionStack and imported via SSM parameters.
 
+    // ============================================================
+    // Branding Configuration Table (single-item: PK=BRANDING SK=GLOBAL)
+    // ============================================================
+    const brandingTable = new dynamodb.Table(this, 'BrandingTable', {
+      tableName: `${config.projectPrefix}-branding`,
+      partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      pointInTimeRecovery: true,
+      removalPolicy: getRemovalPolicy(config),
+      encryption: dynamodb.TableEncryption.AWS_MANAGED,
+    });
+
 
 
 
@@ -565,6 +578,8 @@ export class AppApiStack extends cdk.Stack {
         // app-api fetches once at startup.
         VOICE_TICKET_REPLAY_TABLE_NAME: voiceTicketReplayTableName,
         VOICE_TICKET_SIGNING_SECRET_ARN: voiceTicketSigningSecretArn,
+        // Branding configuration table (single-item, local to this stack)
+        DYNAMODB_BRANDING_TABLE_NAME: brandingTable.tableName,
       },
       portMappings: [
         {
@@ -586,6 +601,9 @@ export class AppApiStack extends cdk.Stack {
 
     // Grant permissions for assistants base table (local to this stack)
     assistantsTable.grantReadWriteData(taskDefinition.taskRole);
+
+    // Grant permissions for branding table (local to this stack)
+    brandingTable.grantReadWriteData(taskDefinition.taskRole);
 
     // Grant permissions for user settings table (imported from InfrastructureStack)
     taskDefinition.taskRole.addToPrincipalPolicy(
@@ -1482,6 +1500,12 @@ export class AppApiStack extends cdk.Stack {
         resources: [memoryArn],
       })
     );
+
+    // Publish branding table name to SSM for discoverability
+    new ssm.StringParameter(this, 'BrandingTableName', {
+      parameterName: `/${config.projectPrefix}/branding/table-name`,
+      stringValue: brandingTable.tableName,
+    });
 
     // ============================================================
     // Target Group

@@ -9,6 +9,7 @@ import { withCredentialsInterceptor } from './auth/with-credentials.interceptor'
 import { MARKED_OPTIONS, MarkedOptions, MarkedRenderer, provideMarkdown } from 'ngx-markdown';
 import { SessionService } from './auth/session.service';
 import { ThemeService } from './components/topnav/components/theme-toggle/theme.service';
+import { BrandingService } from './services/branding/branding.service';
 
 function markedOptionsFactory(): MarkedOptions {
   const renderer = new MarkedRenderer();
@@ -39,6 +40,12 @@ export const appConfig: ApplicationConfig = {
       },
     }),
     provideRouter(routes, withComponentInputBinding()),
+
+    // Apply brand colors and logos before the first component renders so that
+    // even the login page uses the correct palette. Failures are swallowed
+    // inside BrandingService.bootstrap() so a misconfigured branding endpoint
+    // never blocks the app from loading.
+    provideAppInitializer(() => inject(BrandingService).bootstrap()),
 
     // Bootstrap the BFF cookie session before the first component renders.
     // GET ${appApiUrl}/auth/session — on 401, SessionService sends the browser

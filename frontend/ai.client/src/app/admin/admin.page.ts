@@ -17,6 +17,7 @@ import {
   heroLink,
   heroFingerPrint,
   heroAcademicCap,
+  heroPaintBrush,
 } from '@ng-icons/heroicons/outline';
 
 interface AdminFeature {
@@ -46,6 +47,7 @@ interface AdminFeature {
       heroLink,
       heroFingerPrint,
       heroAcademicCap,
+      heroPaintBrush,
     })
   ],
   templateUrl: './admin.page.html',
@@ -114,6 +116,12 @@ export class AdminPage {
       description: 'Configure third-party OAuth integrations that users can connect for MCP tool authentication. Manage Google, Microsoft, GitHub, and custom connectors.',
       icon: 'heroLink',
       route: '/admin/connectors',
+    },
+    {
+      title: 'Branding',
+      description: 'Customise the application colour palette, logos, and favicon. Changes apply globally to all users including the login page.',
+      icon: 'heroPaintBrush',
+      route: '/admin/branding',
     },
     {
       title: 'Fine-Tuning Access',

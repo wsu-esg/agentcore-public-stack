@@ -273,46 +273,56 @@ html.dark body {
     background-color: var(--color-gray-900);
 }
 
+/* Default brand base colors — overridden at runtime by BrandingService via a
+   dynamic <style id="dynamic-branding"> injected into <head>. The @theme block
+   below derives every shade from these three variables so a single runtime
+   override rewrites the whole palette without a page reload. */
+:root {
+    --color-primary-base: #0033a0;
+    --color-secondary-base: #d64309;
+    --color-tertiary-base: #0072ce;
+}
+
 @theme {
     --font-sans: 'InterVariable', sans-serif;
     --font-sans--font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
 
-    /* Primary color scale - #0033a0 */
-    --color-primary-50: oklch(from #0033a0 calc(l + 0.4) c h);
-    --color-primary-100: oklch(from #0033a0 calc(l + 0.35) c h);
-    --color-primary-200: oklch(from #0033a0 calc(l + 0.3) c h);
-    --color-primary-300: oklch(from #0033a0 calc(l + 0.2) c h);
-    --color-primary-400: oklch(from #0033a0 calc(l + 0.1) c h);
-    --color-primary-500: #0033a0;
-    --color-primary-600: oklch(from #0033a0 calc(l - 0.1) c h);
-    --color-primary-700: oklch(from #0033a0 calc(l - 0.15) c h);
-    --color-primary-800: oklch(from #0033a0 calc(l - 0.2) c h);
-    --color-primary-900: oklch(from #0033a0 calc(l - 0.25) c h);
-    --color-primary-950: oklch(from #0033a0 calc(l - 0.3) c h);
+    /* Primary color scale — override --color-primary-base to retheme */
+    --color-primary-50: oklch(from var(--color-primary-base) calc(l + 0.4) c h);
+    --color-primary-100: oklch(from var(--color-primary-base) calc(l + 0.35) c h);
+    --color-primary-200: oklch(from var(--color-primary-base) calc(l + 0.3) c h);
+    --color-primary-300: oklch(from var(--color-primary-base) calc(l + 0.2) c h);
+    --color-primary-400: oklch(from var(--color-primary-base) calc(l + 0.1) c h);
+    --color-primary-500: var(--color-primary-base);
+    --color-primary-600: oklch(from var(--color-primary-base) calc(l - 0.1) c h);
+    --color-primary-700: oklch(from var(--color-primary-base) calc(l - 0.15) c h);
+    --color-primary-800: oklch(from var(--color-primary-base) calc(l - 0.2) c h);
+    --color-primary-900: oklch(from var(--color-primary-base) calc(l - 0.25) c h);
+    --color-primary-950: oklch(from var(--color-primary-base) calc(l - 0.3) c h);
 
-    /* Secondary color scale - #d64309 */
-    --color-secondary-50: oklch(from #d64309 calc(l + 0.4) c h);
-    --color-secondary-100: oklch(from #d64309 calc(l + 0.35) c h);
-    --color-secondary-200: oklch(from #d64309 calc(l + 0.3) c h);
-    --color-secondary-300: oklch(from #d64309 calc(l + 0.2) c h);
-    --color-secondary-400: oklch(from #d64309 calc(l + 0.1) c h);
-    --color-secondary-500: #d64309;
-    --color-secondary-600: oklch(from #d64309 calc(l - 0.1) c h);
-    --color-secondary-700: oklch(from #d64309 calc(l - 0.15) c h);
-    --color-secondary-800: oklch(from #d64309 calc(l - 0.2) c h);
-    --color-secondary-900: oklch(from #d64309 calc(l - 0.25) c h);
-    --color-secondary-950: oklch(from #d64309 calc(l - 0.3) c h);
+    /* Secondary color scale — override --color-secondary-base to retheme */
+    --color-secondary-50: oklch(from var(--color-secondary-base) calc(l + 0.4) c h);
+    --color-secondary-100: oklch(from var(--color-secondary-base) calc(l + 0.35) c h);
+    --color-secondary-200: oklch(from var(--color-secondary-base) calc(l + 0.3) c h);
+    --color-secondary-300: oklch(from var(--color-secondary-base) calc(l + 0.2) c h);
+    --color-secondary-400: oklch(from var(--color-secondary-base) calc(l + 0.1) c h);
+    --color-secondary-500: var(--color-secondary-base);
+    --color-secondary-600: oklch(from var(--color-secondary-base) calc(l - 0.1) c h);
+    --color-secondary-700: oklch(from var(--color-secondary-base) calc(l - 0.15) c h);
+    --color-secondary-800: oklch(from var(--color-secondary-base) calc(l - 0.2) c h);
+    --color-secondary-900: oklch(from var(--color-secondary-base) calc(l - 0.25) c h);
+    --color-secondary-950: oklch(from var(--color-secondary-base) calc(l - 0.3) c h);
 
-    /* Tertiary color scale - #0072ce */
-    --color-tertiary-50: oklch(from #0072ce calc(l + 0.4) c h);
-    --color-tertiary-100: oklch(from #0072ce calc(l + 0.35) c h);
-    --color-tertiary-200: oklch(from #0072ce calc(l + 0.3) c h);
-    --color-tertiary-300: oklch(from #0072ce calc(l + 0.2) c h);
-    --color-tertiary-400: oklch(from #0072ce calc(l + 0.1) c h);
-    --color-tertiary-500: #0072ce;
-    --color-tertiary-600: oklch(from #0072ce calc(l - 0.1) c h);
-    --color-tertiary-700: oklch(from #0072ce calc(l - 0.15) c h);
-    --color-tertiary-800: oklch(from #0072ce calc(l - 0.2) c h);
-    --color-tertiary-900: oklch(from #0072ce calc(l - 0.25) c h);
-    --color-tertiary-950: oklch(from #0072ce calc(l - 0.3) c h);
+    /* Tertiary color scale — override --color-tertiary-base to retheme */
+    --color-tertiary-50: oklch(from var(--color-tertiary-base) calc(l + 0.4) c h);
+    --color-tertiary-100: oklch(from var(--color-tertiary-base) calc(l + 0.35) c h);
+    --color-tertiary-200: oklch(from var(--color-tertiary-base) calc(l + 0.3) c h);
+    --color-tertiary-300: oklch(from var(--color-tertiary-base) calc(l + 0.2) c h);
+    --color-tertiary-400: oklch(from var(--color-tertiary-base) calc(l + 0.1) c h);
+    --color-tertiary-500: var(--color-tertiary-base);
+    --color-tertiary-600: oklch(from var(--color-tertiary-base) calc(l - 0.1) c h);
+    --color-tertiary-700: oklch(from var(--color-tertiary-base) calc(l - 0.15) c h);
+    --color-tertiary-800: oklch(from var(--color-tertiary-base) calc(l - 0.2) c h);
+    --color-tertiary-900: oklch(from var(--color-tertiary-base) calc(l - 0.25) c h);
+    --color-tertiary-950: oklch(from var(--color-tertiary-base) calc(l - 0.3) c h);
 }

@@ -49,6 +49,7 @@ PUBLIC_ROUTE_PATTERNS: set[str] = {
     "/docs",
     "/docs/oauth2-redirect",
     "/redoc",
+    "/branding",  # Public branding config — intentionally unauthenticated so login page can apply custom theme.
 }
 
 

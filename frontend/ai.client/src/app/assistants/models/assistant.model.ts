@@ -19,6 +19,9 @@ export interface Assistant {
   // Share metadata (only present for shared assistants)
   firstInteracted?: boolean;
   isSharedWithMe?: boolean;
+
+  // Discovery metadata (true for PUBLIC assistants the user doesn't own)
+  isPublic?: boolean;
 }
 
 export interface CreateAssistantDraftRequest {

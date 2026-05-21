@@ -45,6 +45,30 @@
     </section>
   }
 
+  <!-- Public Assistants Section -->
+  @if (publicAssistants().length > 0) {
+    <section>
+      <div class="flex items-center gap-3 mb-6 px-1">
+        <ng-icon name="heroGlobeAlt" class="size-3.5 text-blue-400 dark:text-blue-500" />
+        <h2 class="text-xs font-bold uppercase tracking-widest text-gray-400 dark:text-gray-500">
+          Public Assistants
+        </h2>
+        <div class="flex-1 h-px bg-gray-200 dark:bg-gray-700/60"></div>
+        <span class="text-xs tabular-nums font-medium text-gray-400 dark:text-gray-500">
+          {{ publicAssistants().length }}
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        @for (assistant of publicAssistants(); track assistant.assistantId; let idx = $index) {
+          <ng-container
+            *ngTemplateOutlet="assistantCard; context: { $implicit: assistant, isOwned: false, index: idx }"
+          ></ng-container>
+        }
+      </div>
+    </section>
+  }
+
   <!-- Empty State -->
   @if (assistants().length === 0) {
     <div role="status" class="flex flex-col items-center justify-center py-24 text-center">

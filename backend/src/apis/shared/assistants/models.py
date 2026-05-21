@@ -93,6 +93,10 @@ class AssistantResponse(BaseModel):
     is_shared_with_me: Optional[bool] = Field(
         None, alias="isSharedWithMe", description="Whether this assistant is shared with the requesting user (not owned)"
     )
+    # Discovery metadata
+    is_public: Optional[bool] = Field(
+        None, alias="isPublic", description="Whether this assistant is publicly visible to all users"
+    )
 
 
 class AssistantsListResponse(BaseModel):

@@ -1137,3 +1137,86 @@ async def list_shared_with_user(user_email: str) -> List[Assistant]:
     except Exception as e:
         logger.error(f"Error listing shared assistants: {e}", exc_info=True)
         return []
+
+
+async def list_public_assistants(exclude_owner_id: str) -> List[Assistant]:
+    """Return all COMPLETE PUBLIC assistants not owned by ``exclude_owner_id``.
+
+    Queries the VisibilityStatusIndex GSI (``GSI2_PK = "VISIBILITY#PUBLIC"``)
+    so only assistants explicitly marked PUBLIC are returned.  The caller's
+    own PUBLIC assistants are excluded — they already appear under "My
+    Assistants" on the frontend.
+
+    Args:
+        exclude_owner_id: The requesting user's ID.  Any assistant whose
+            ``ownerId`` matches this value is filtered out.
+
+    Returns:
+        List of Assistant objects, sorted newest-first.
+    """
+    assistants_table = os.environ.get("DYNAMODB_ASSISTANTS_TABLE_NAME")
+    if not assistants_table:
+        raise RuntimeError("DYNAMODB_ASSISTANTS_TABLE_NAME environment variable is required")
+
+    try:
+        import boto3
+        from boto3.dynamodb.conditions import Key, Attr
+        from botocore.exceptions import ClientError
+
+        dynamodb = boto3.resource("dynamodb")
+        table = dynamodb.Table(assistants_table)
+
+        # Query the VisibilityStatusIndex for all PUBLIC items.
+        # FilterExpression excludes DRAFT assistants and the caller's own
+        # assistants server-side so we don't return stale/irrelevant rows.
+        response = table.query(
+            IndexName="VisibilityStatusIndex",
+            KeyConditionExpression=Key("GSI2_PK").eq("VISIBILITY#PUBLIC"),
+            FilterExpression=(
+                Attr("status").ne("DRAFT") & Attr("ownerId").ne(exclude_owner_id)
+            ),
+        )
+
+        assistants: List[Assistant] = []
+        for item in response.get("Items", []):
+            try:
+                assistants.append(Assistant.model_validate(item))
+            except Exception as exc:
+                logger.warning("Failed to parse public assistant item: %s", exc)
+
+        # Handle DynamoDB pagination (unlikely to be large in practice, but correct)
+        while response.get("LastEvaluatedKey"):
+            response = table.query(
+                IndexName="VisibilityStatusIndex",
+                KeyConditionExpression=Key("GSI2_PK").eq("VISIBILITY#PUBLIC"),
+                FilterExpression=(
+                    Attr("status").ne("DRAFT") & Attr("ownerId").ne(exclude_owner_id)
+                ),
+                ExclusiveStartKey=response["LastEvaluatedKey"],
+            )
+            for item in response.get("Items", []):
+                try:
+                    assistants.append(Assistant.model_validate(item))
+                except Exception as exc:
+                    logger.warning("Failed to parse public assistant item: %s", exc)
+
+        # Sort newest-first (GSI2_SK encodes created_at; sort in Python for simplicity)
+        assistants.sort(key=lambda a: a.created_at, reverse=True)
+
+        logger.info(
+            "Found %d public assistants (excluding owner %s)",
+            len(assistants),
+            exclude_owner_id,
+        )
+        return assistants
+
+    except ClientError as e:
+        error_code = e.response.get("Error", {}).get("Code", "Unknown")
+        if error_code == "ResourceNotFoundException":
+            logger.debug("VisibilityStatusIndex GSI not found — public discovery unavailable")
+        else:
+            logger.error("Error listing public assistants: %s", e)
+        return []
+    except Exception as e:
+        logger.error("Error listing public assistants: %s", e, exc_info=True)
+        return []

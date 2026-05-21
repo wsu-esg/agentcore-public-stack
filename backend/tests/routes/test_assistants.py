@@ -88,6 +88,10 @@ class TestListAssistantsAuthenticated:
             f"{ROUTES_MODULE}.list_shared_with_user",
             new_callable=AsyncMock,
             return_value=[],
+        ), patch(
+            f"{ROUTES_MODULE}.list_public_assistants",
+            new_callable=AsyncMock,
+            return_value=[],
         ):
             client = TestClient(app)
             resp = client.get("/assistants")
@@ -109,6 +113,10 @@ class TestListAssistantsAuthenticated:
             return_value=([], None),
         ), patch(
             f"{ROUTES_MODULE}.list_shared_with_user",
+            new_callable=AsyncMock,
+            return_value=[],
+        ), patch(
+            f"{ROUTES_MODULE}.list_public_assistants",
             new_callable=AsyncMock,
             return_value=[],
         ):

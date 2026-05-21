@@ -30,6 +30,7 @@ from apis.shared.assistants.models import (
     UpdateAssistantRequest,
 )
 from apis.shared.assistants.service import (
+    list_public_assistants,
     assistant_exists,
     create_assistant,
     create_assistant_draft,
@@ -198,6 +199,9 @@ async def list_assistants_endpoint(
         # Also get assistants shared with this user
         shared_assistants = await list_shared_with_user(current_user.email)
 
+        # Also get all public assistants not owned by this user
+        public_assistants = await list_public_assistants(exclude_owner_id=user_id)
+
         # Filter out duplicates (assistants the user already owns)
         owned_assistant_ids = {a.assistant_id for a in assistants}
         unique_shared = [a for a in shared_assistants if a.assistant_id not in owned_assistant_ids]
@@ -207,8 +211,17 @@ async def list_assistants_endpoint(
             assistant.is_shared_with_me = True
             # first_interacted is already set by list_shared_with_user
 
-        # Combine lists (user's own assistants first, then shared)
-        all_assistants = assistants + unique_shared
+        # Deduplicate public assistants against owned + shared sets
+        shared_and_owned_ids = owned_assistant_ids | {a.assistant_id for a in unique_shared}
+        unique_public = [a for a in public_assistants if a.assistant_id not in shared_and_owned_ids]
+
+        # Mark public assistants so the frontend can render them in a distinct section
+        for assistant in unique_public:
+            assistant.is_shared_with_me = False
+            assistant.is_public = True
+
+        # Combine lists: user's own → explicitly shared → public discovery
+        all_assistants = assistants + unique_shared + unique_public
 
         # Sort by created_at descending (most recent first)
         all_assistants.sort(key=lambda x: x.created_at, reverse=True)

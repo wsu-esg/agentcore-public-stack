@@ -112,11 +112,15 @@ export class AssistantListComponent {
   openMenuId = signal<string | null>(null);
 
   myAssistants = computed(() => {
-    return this.assistants().filter((a) => !a.isSharedWithMe);
+    return this.assistants().filter((a) => !a.isSharedWithMe && !a.isPublic);
   });
 
   sharedWithMe = computed(() => {
-    return this.assistants().filter((a) => a.isSharedWithMe);
+    return this.assistants().filter((a) => a.isSharedWithMe && !a.isPublic);
+  });
+
+  publicAssistants = computed(() => {
+    return this.assistants().filter((a) => a.isPublic);
   });
 
   @HostListener('document:click', ['$event'])

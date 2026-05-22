@@ -35,6 +35,10 @@ async def get_branding() -> Optional[BrandingConfig]:
                 primary=item["primary_color"],
                 secondary=item.get("secondary_color", "#d64309"),
                 tertiary=item.get("tertiary_color", "#0072ce"),
+                sidebar_bg=item.get("sidebar_bg") or None,
+                sidebar_bg_dark=item.get("sidebar_bg_dark") or None,
+                chat_bg=item.get("chat_bg") or None,
+                chat_bg_dark=item.get("chat_bg_dark") or None,
             )
         return BrandingConfig(
             colors=colors,
@@ -59,6 +63,14 @@ async def save_branding(config: BrandingConfig) -> None:
         item["primary_color"] = config.colors.primary
         item["secondary_color"] = config.colors.secondary
         item["tertiary_color"] = config.colors.tertiary
+        if config.colors.sidebar_bg is not None:
+            item["sidebar_bg"] = config.colors.sidebar_bg
+        if config.colors.sidebar_bg_dark is not None:
+            item["sidebar_bg_dark"] = config.colors.sidebar_bg_dark
+        if config.colors.chat_bg is not None:
+            item["chat_bg"] = config.colors.chat_bg
+        if config.colors.chat_bg_dark is not None:
+            item["chat_bg_dark"] = config.colors.chat_bg_dark
     if config.logo_light_s3_key is not None:
         item["logo_light_s3_key"] = config.logo_light_s3_key
     if config.logo_dark_s3_key is not None:

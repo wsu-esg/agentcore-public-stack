@@ -17,7 +17,7 @@ describe('ThemeService', () => {
       removeItem: vi.fn((key: string) => { delete localStorageMock[key]; }),
       clear: vi.fn(() => { localStorageMock = {}; }),
     };
-    Object.defineProperty(window, 'localStorage', { value: storageMock, writable: true });
+    Object.defineProperty(globalThis, 'localStorage', { value: storageMock, writable: true, configurable: true });
 
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [ThemeService] });

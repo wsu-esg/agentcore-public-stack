@@ -83,3 +83,40 @@ async def presign_logo_upload(req: LogoPresignRequest) -> LogoPresignResponse:
         ExpiresIn=_PRESIGN_TTL,
     )
     return LogoPresignResponse(presigned_url=url, s3_key=s3_key, expires_at=expires_at)
+
+
+_MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB — enough for any logo or favicon
+
+
+async def upload_logo_asset(
+    asset_type: str,
+    file_bytes: bytes,
+    content_type: str,
+    filename: str,
+    updated_by: str,
+) -> BrandingConfigResponse:
+    """Upload a logo or favicon directly to S3 and save the S3 key to branding config.
+
+    Accepts the raw file bytes from the app-api multipart endpoint so the
+    browser never talks to S3 directly, removing any S3 CORS requirement.
+    """
+    if asset_type not in ALLOWED_ASSET_TYPES:
+        raise ValueError(f"asset_type must be one of {ALLOWED_ASSET_TYPES}")
+    if content_type not in ALLOWED_CONTENT_TYPES:
+        raise ValueError(f"content_type must be one of {ALLOWED_CONTENT_TYPES}")
+    if len(file_bytes) > _MAX_UPLOAD_BYTES:
+        raise ValueError(f"File exceeds the {_MAX_UPLOAD_BYTES // (1024 * 1024)} MB limit")
+
+    ext = filename.rsplit(".", 1)[-1] if "." in filename else "bin"
+    s3_key = f"branding/{asset_type}/{uuid.uuid4()}.{ext}"
+
+    _s3_client().put_object(
+        Bucket=_bucket_name(),
+        Key=s3_key,
+        Body=file_bytes,
+        ContentType=content_type,
+    )
+    logger.info("Uploaded branding asset: %s (%s bytes)", s3_key, len(file_bytes))
+
+    field = f"{asset_type}_s3_key"
+    return await update_branding(UpdateBrandingRequest(**{field: s3_key}), updated_by=updated_by)

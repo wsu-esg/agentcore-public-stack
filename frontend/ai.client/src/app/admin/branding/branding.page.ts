@@ -6,17 +6,22 @@ import { FormsModule } from '@angular/forms';
 import { NgIf } from '@angular/common';
 import { firstValueFrom } from 'rxjs';
 import { BrandingService, BrandingColors } from '../../services/branding/branding.service';
+import { ConfigService } from '../../services/config.service';
 
 interface BrandingResponse {
-  colors?: { primary: string; secondary: string; tertiary: string };
+  colors?: {
+    primary: string;
+    secondary: string;
+    tertiary: string;
+    sidebar_bg?: string;
+    sidebar_bg_dark?: string;
+  };
   logo_light_url?: string;
   logo_dark_url?: string;
   favicon_url?: string;
 }
 
 type AssetType = 'logo_light' | 'logo_dark' | 'favicon';
-
-const API = '/api/admin/branding';
 
 @Component({
   selector: 'app-branding-page',
@@ -52,6 +57,29 @@ const API = '/api/admin/branding';
             </div>
           }
         </div>
+
+        <!-- Background Colours sub-section -->
+        <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300 pt-2">Background Colours</h3>
+        <p class="text-xs text-gray-500 dark:text-gray-400 -mt-2">
+          Controls the sidebar and top bar background in each colour mode.
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          @for (swatch of bgSwatches(); track swatch.key) {
+            <div class="flex flex-col gap-2">
+              <label class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ swatch.label }}</label>
+              <div class="flex items-center gap-3">
+                <input
+                  type="color"
+                  [value]="swatch.value"
+                  (input)="onColorInput(swatch.key, $event)"
+                  class="h-10 w-16 rounded border border-gray-300 dark:border-gray-600 cursor-pointer"
+                />
+                <span class="text-xs font-mono text-gray-500 dark:text-gray-400">{{ swatch.value }}</span>
+              </div>
+            </div>
+          }
+        </div>
+
         <div class="flex items-center gap-3 pt-2">
           <button
             (click)="saveColors()"
@@ -118,14 +146,23 @@ const API = '/api/admin/branding';
 export class BrandingPage implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly brandingSvc = inject(BrandingService);
+  private readonly configService = inject(ConfigService);
+
+  private get api(): string {
+    return `${this.configService.appApiUrl()}/admin/branding`;
+  }
 
   readonly DEFAULT_PRIMARY = '#0033a0';
   readonly DEFAULT_SECONDARY = '#d64309';
   readonly DEFAULT_TERTIARY = '#0072ce';
+  readonly DEFAULT_SIDEBAR_BG = '#f3f4f6';       // gray-100
+  readonly DEFAULT_SIDEBAR_BG_DARK = '#111827';  // gray-900
 
   readonly primary = signal(this.DEFAULT_PRIMARY);
   readonly secondary = signal(this.DEFAULT_SECONDARY);
   readonly tertiary = signal(this.DEFAULT_TERTIARY);
+  readonly sidebarBg = signal(this.DEFAULT_SIDEBAR_BG);
+  readonly sidebarBgDark = signal(this.DEFAULT_SIDEBAR_BG_DARK);
 
   readonly savingColors = signal(false);
   readonly colorsSaved = signal(false);
@@ -145,6 +182,11 @@ export class BrandingPage implements OnInit {
     { key: 'tertiary' as const, label: 'Tertiary', value: this.tertiary() },
   ];
 
+  readonly bgSwatches = () => [
+    { key: 'sidebar_bg' as const, label: 'Sidebar / Nav (light mode)', value: this.sidebarBg() },
+    { key: 'sidebar_bg_dark' as const, label: 'Sidebar / Nav (dark mode)', value: this.sidebarBgDark() },
+  ];
+
   readonly assetSlots = () => [
     { type: 'logo_light' as AssetType, label: 'Logo (light mode)', currentUrl: this.logoLightUrl() },
     { type: 'logo_dark' as AssetType, label: 'Logo (dark mode)', currentUrl: this.logoDarkUrl() },
@@ -153,11 +195,13 @@ export class BrandingPage implements OnInit {
 
   async ngOnInit(): Promise<void> {
     try {
-      const cfg = await firstValueFrom(this.http.get<BrandingResponse>(API));
+      const cfg = await firstValueFrom(this.http.get<BrandingResponse>(this.api));
       if (cfg.colors) {
         this.primary.set(cfg.colors.primary);
         this.secondary.set(cfg.colors.secondary);
         this.tertiary.set(cfg.colors.tertiary);
+        if (cfg.colors.sidebar_bg) this.sidebarBg.set(cfg.colors.sidebar_bg);
+        if (cfg.colors.sidebar_bg_dark) this.sidebarBgDark.set(cfg.colors.sidebar_bg_dark);
       }
       this.logoLightUrl.set(cfg.logo_light_url);
       this.logoDarkUrl.set(cfg.logo_dark_url);
@@ -165,11 +209,16 @@ export class BrandingPage implements OnInit {
     } catch { /* defaults remain */ }
   }
 
-  onColorInput(key: 'primary' | 'secondary' | 'tertiary', event: Event): void {
+  onColorInput(
+    key: 'primary' | 'secondary' | 'tertiary' | 'sidebar_bg' | 'sidebar_bg_dark',
+    event: Event,
+  ): void {
     const value = (event.target as HTMLInputElement).value;
     if (key === 'primary') this.primary.set(value);
     else if (key === 'secondary') this.secondary.set(value);
-    else this.tertiary.set(value);
+    else if (key === 'tertiary') this.tertiary.set(value);
+    else if (key === 'sidebar_bg') this.sidebarBg.set(value);
+    else this.sidebarBgDark.set(value);
     this.colorsSaved.set(false);
   }
 
@@ -181,9 +230,11 @@ export class BrandingPage implements OnInit {
       primary: this.primary(),
       secondary: this.secondary(),
       tertiary: this.tertiary(),
+      sidebar_bg: this.sidebarBg(),
+      sidebar_bg_dark: this.sidebarBgDark(),
     };
     try {
-      await firstValueFrom(this.http.put(API, { colors }));
+      await firstValueFrom(this.http.put(this.api, { colors }));
       this.brandingSvc.applyColors(colors);
       this.colorsSaved.set(true);
       setTimeout(() => this.colorsSaved.set(false), 3000);
@@ -198,6 +249,8 @@ export class BrandingPage implements OnInit {
     this.primary.set(this.DEFAULT_PRIMARY);
     this.secondary.set(this.DEFAULT_SECONDARY);
     this.tertiary.set(this.DEFAULT_TERTIARY);
+    this.sidebarBg.set(this.DEFAULT_SIDEBAR_BG);
+    this.sidebarBgDark.set(this.DEFAULT_SIDEBAR_BG_DARK);
     await this.saveColors();
   }
 
@@ -208,24 +261,15 @@ export class BrandingPage implements OnInit {
     this.assetSaved.set(null);
     this.assetErrors.update(e => ({ ...e, [assetType]: undefined }));
     try {
-      // Step 1: get presigned PUT URL
-      const presign = await firstValueFrom(this.http.post<{ presigned_url: string; s3_key: string }>(
-        `${API}/presign-logo`,
-        { asset_type: assetType, content_type: file.type, filename: file.name },
-      ));
-      // Step 2: upload directly to S3
-      await firstValueFrom(
-        this.http.put(presign.presigned_url, file, {
-          headers: { 'Content-Type': file.type },
-        })
-      );
-      // Step 3: save s3_key to branding config
-      const field = assetType === 'logo_light' ? 'logo_light_s3_key'
-        : assetType === 'logo_dark' ? 'logo_dark_s3_key' : 'favicon_s3_key';
+      // Send the file directly to app-api via multipart form. The server uploads
+      // to S3, so no S3 CORS configuration is required on the browser side.
+      const formData = new FormData();
+      formData.append('asset_type', assetType);
+      formData.append('file', file, file.name);
       const updated = await firstValueFrom(
-        this.http.put<BrandingResponse>(API, { [field]: presign.s3_key })
+        this.http.post<BrandingResponse>(`${this.api}/upload-logo`, formData)
       );
-      // Update preview
+      // Update preview URLs from the returned branding config
       if (assetType === 'logo_light') this.logoLightUrl.set(updated.logo_light_url);
       if (assetType === 'logo_dark') this.logoDarkUrl.set(updated.logo_dark_url);
       if (assetType === 'favicon') this.faviconUrl.set(updated.favicon_url);

@@ -7,6 +7,8 @@ class BrandingColors(BaseModel):
     primary: str = Field(description="Hex color for primary scale, e.g. #0033a0")
     secondary: str = Field(description="Hex color for secondary scale, e.g. #d64309")
     tertiary: str = Field(description="Hex color for tertiary scale, e.g. #0072ce")
+    sidebar_bg: Optional[str] = Field(None, description="Sidebar/nav background in light mode, e.g. #f3f4f6")
+    sidebar_bg_dark: Optional[str] = Field(None, description="Sidebar/nav background in dark mode, e.g. #111827")
 
 
 class BrandingConfig(BaseModel):

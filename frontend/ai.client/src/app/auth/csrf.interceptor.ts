@@ -1,6 +1,7 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 
+import { ConfigService } from '../services/config.service';
 import { SessionService } from './session.service';
 
 /**
@@ -25,11 +26,24 @@ import { SessionService } from './session.service';
  * enforce on them anyway. `fetchEventSource` lives outside the HttpClient
  * pipeline (chat SSE path), so chat-http.service.ts attaches the header
  * manually using the same `csrfHeaders()` helper.
+ *
+ * Scoped to app-api URLs only — third-party hosts such as S3 presigned PUT
+ * URLs must not receive the CSRF header because it is not part of their
+ * request signature and will cause SignatureDoesNotMatch / CORS preflight
+ * failures.
  */
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 export const csrfInterceptor: HttpInterceptorFn = (req, next) => {
   if (SAFE_METHODS.has(req.method)) {
+    return next(req);
+  }
+
+  // Only attach CSRF header to requests targeting our own API.
+  // Requests to third-party hosts (e.g. S3 presigned PUT URLs) must pass
+  // through unmodified — the extra header would break the AWS signature.
+  const appApiUrl = inject(ConfigService).appApiUrl();
+  if (appApiUrl && !req.url.startsWith(appApiUrl)) {
     return next(req);
   }
 

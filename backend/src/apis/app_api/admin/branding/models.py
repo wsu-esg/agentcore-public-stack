@@ -9,6 +9,8 @@ class BrandingColors(BaseModel):
     tertiary: str = Field(description="Hex color for tertiary scale, e.g. #0072ce")
     sidebar_bg: Optional[str] = Field(None, description="Sidebar/nav background in light mode, e.g. #f3f4f6")
     sidebar_bg_dark: Optional[str] = Field(None, description="Sidebar/nav background in dark mode, e.g. #111827")
+    chat_bg: Optional[str] = Field(None, description="Chat frame background in light mode, e.g. #f9fafb")
+    chat_bg_dark: Optional[str] = Field(None, description="Chat frame background in dark mode, e.g. #111827")
 
 
 class BrandingConfig(BaseModel):

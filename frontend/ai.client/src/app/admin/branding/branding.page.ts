@@ -15,6 +15,8 @@ interface BrandingResponse {
     tertiary: string;
     sidebar_bg?: string;
     sidebar_bg_dark?: string;
+    chat_bg?: string;
+    chat_bg_dark?: string;
   };
   logo_light_url?: string;
   logo_dark_url?: string;
@@ -157,12 +159,16 @@ export class BrandingPage implements OnInit {
   readonly DEFAULT_TERTIARY = '#0072ce';
   readonly DEFAULT_SIDEBAR_BG = '#f3f4f6';       // gray-100
   readonly DEFAULT_SIDEBAR_BG_DARK = '#111827';  // gray-900
+  readonly DEFAULT_CHAT_BG = '#f9fafb';          // gray-50
+  readonly DEFAULT_CHAT_BG_DARK = '#111827';     // gray-900
 
   readonly primary = signal(this.DEFAULT_PRIMARY);
   readonly secondary = signal(this.DEFAULT_SECONDARY);
   readonly tertiary = signal(this.DEFAULT_TERTIARY);
   readonly sidebarBg = signal(this.DEFAULT_SIDEBAR_BG);
   readonly sidebarBgDark = signal(this.DEFAULT_SIDEBAR_BG_DARK);
+  readonly chatBg = signal(this.DEFAULT_CHAT_BG);
+  readonly chatBgDark = signal(this.DEFAULT_CHAT_BG_DARK);
 
   readonly savingColors = signal(false);
   readonly colorsSaved = signal(false);
@@ -185,6 +191,8 @@ export class BrandingPage implements OnInit {
   readonly bgSwatches = () => [
     { key: 'sidebar_bg' as const, label: 'Sidebar / Nav (light mode)', value: this.sidebarBg() },
     { key: 'sidebar_bg_dark' as const, label: 'Sidebar / Nav (dark mode)', value: this.sidebarBgDark() },
+    { key: 'chat_bg' as const, label: 'Chat frame (light mode)', value: this.chatBg() },
+    { key: 'chat_bg_dark' as const, label: 'Chat frame (dark mode)', value: this.chatBgDark() },
   ];
 
   readonly assetSlots = () => [
@@ -202,6 +210,8 @@ export class BrandingPage implements OnInit {
         this.tertiary.set(cfg.colors.tertiary);
         if (cfg.colors.sidebar_bg) this.sidebarBg.set(cfg.colors.sidebar_bg);
         if (cfg.colors.sidebar_bg_dark) this.sidebarBgDark.set(cfg.colors.sidebar_bg_dark);
+        if (cfg.colors.chat_bg) this.chatBg.set(cfg.colors.chat_bg);
+        if (cfg.colors.chat_bg_dark) this.chatBgDark.set(cfg.colors.chat_bg_dark);
       }
       this.logoLightUrl.set(cfg.logo_light_url);
       this.logoDarkUrl.set(cfg.logo_dark_url);
@@ -210,7 +220,7 @@ export class BrandingPage implements OnInit {
   }
 
   onColorInput(
-    key: 'primary' | 'secondary' | 'tertiary' | 'sidebar_bg' | 'sidebar_bg_dark',
+    key: 'primary' | 'secondary' | 'tertiary' | 'sidebar_bg' | 'sidebar_bg_dark' | 'chat_bg' | 'chat_bg_dark',
     event: Event,
   ): void {
     const value = (event.target as HTMLInputElement).value;
@@ -218,7 +228,9 @@ export class BrandingPage implements OnInit {
     else if (key === 'secondary') this.secondary.set(value);
     else if (key === 'tertiary') this.tertiary.set(value);
     else if (key === 'sidebar_bg') this.sidebarBg.set(value);
-    else this.sidebarBgDark.set(value);
+    else if (key === 'sidebar_bg_dark') this.sidebarBgDark.set(value);
+    else if (key === 'chat_bg') this.chatBg.set(value);
+    else this.chatBgDark.set(value);
     this.colorsSaved.set(false);
   }
 
@@ -232,6 +244,8 @@ export class BrandingPage implements OnInit {
       tertiary: this.tertiary(),
       sidebar_bg: this.sidebarBg(),
       sidebar_bg_dark: this.sidebarBgDark(),
+      chat_bg: this.chatBg(),
+      chat_bg_dark: this.chatBgDark(),
     };
     try {
       await firstValueFrom(this.http.put(this.api, { colors }));
@@ -251,6 +265,8 @@ export class BrandingPage implements OnInit {
     this.tertiary.set(this.DEFAULT_TERTIARY);
     this.sidebarBg.set(this.DEFAULT_SIDEBAR_BG);
     this.sidebarBgDark.set(this.DEFAULT_SIDEBAR_BG_DARK);
+    this.chatBg.set(this.DEFAULT_CHAT_BG);
+    this.chatBgDark.set(this.DEFAULT_CHAT_BG_DARK);
     await this.saveColors();
   }
 
@@ -273,6 +289,8 @@ export class BrandingPage implements OnInit {
       if (assetType === 'logo_light') this.logoLightUrl.set(updated.logo_light_url);
       if (assetType === 'logo_dark') this.logoDarkUrl.set(updated.logo_dark_url);
       if (assetType === 'favicon') this.faviconUrl.set(updated.favicon_url);
+      // Propagate logo URLs into BrandingService so the sidenav updates live
+      this.brandingSvc.applyLogoUrls(updated.logo_light_url, updated.logo_dark_url);
       this.assetSaved.set(assetType);
       setTimeout(() => this.assetSaved.set(null), 3000);
     } catch {

@@ -1,11 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
+import { ConfigService } from '../config.service';
 
 export interface BrandingColors {
   primary: string;
   secondary: string;
   tertiary: string;
+  sidebar_bg?: string;
+  sidebar_bg_dark?: string;
 }
 
 export interface BrandingConfig {
@@ -15,12 +18,12 @@ export interface BrandingConfig {
   faviconUrl?: string;
 }
 
-const API_BASE = '/api';
 const BRANDING_STYLE_ID = 'dynamic-branding';
 
 @Injectable({ providedIn: 'root' })
 export class BrandingService {
   private readonly http = inject(HttpClient);
+  private readonly configService = inject(ConfigService);
   private _config: BrandingConfig = {};
 
   get config(): BrandingConfig { return this._config; }
@@ -30,7 +33,7 @@ export class BrandingService {
   async bootstrap(): Promise<void> {
     try {
       const raw = await firstValueFrom(
-        this.http.get<any>(`${API_BASE}/branding`)
+        this.http.get<any>(`${this.configService.appApiUrl()}/branding`)
       );
       this._config = {
         colors: raw.colors,
@@ -63,11 +66,19 @@ export class BrandingService {
     }
     // Override the base color variables; the @theme oklch() expressions
     // derive every shade from these three variables automatically.
+    // Also override structural surface variables so sidenav/topbar background
+    // colors update live without a page reload.
     existing.textContent = `
       :root {
         --color-primary-base: ${colors.primary};
         --color-secondary-base: ${colors.secondary};
         --color-tertiary-base: ${colors.tertiary};
+        --app-sidebar-bg: ${colors.sidebar_bg ?? '#f3f4f6'};
+        --app-topbar-bg: ${colors.sidebar_bg ?? '#f9fafb'};
+      }
+      html.dark {
+        --app-sidebar-bg: ${colors.sidebar_bg_dark ?? '#111827'};
+        --app-topbar-bg: ${colors.sidebar_bg_dark ?? '#111827'};
       }
     `;
   }

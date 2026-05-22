@@ -281,6 +281,15 @@ html.dark body {
     --color-primary-base: #0033a0;
     --color-secondary-base: #d64309;
     --color-tertiary-base: #0072ce;
+
+    /* Structural surface colors — override via dynamic-branding <style> */
+    --app-sidebar-bg: #f3f4f6;  /* gray-100 — sidenav background (light mode) */
+    --app-topbar-bg:  #f9fafb;  /* gray-50  — topbar background (light mode) */
+}
+
+html.dark {
+    --app-sidebar-bg: #111827;  /* gray-900 — sidenav background (dark mode) */
+    --app-topbar-bg:  #111827;  /* gray-900 — topbar background (dark mode) */
 }
 
 @theme {

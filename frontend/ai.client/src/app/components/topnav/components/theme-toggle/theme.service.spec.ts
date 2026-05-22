@@ -4,8 +4,21 @@ import { ThemeService } from './theme.service';
 
 describe('ThemeService', () => {
   let service: ThemeService;
+  let localStorageMock: Record<string, string>;
 
   beforeEach(() => {
+    // Provide a working localStorage stand-in. The test runner's browser
+    // environment may not implement the full Storage API, causing
+    // `localStorage.getItem is not a function` errors.
+    localStorageMock = {};
+    const storageMock = {
+      getItem: vi.fn((key: string) => localStorageMock[key] ?? null),
+      setItem: vi.fn((key: string, value: string) => { localStorageMock[key] = value; }),
+      removeItem: vi.fn((key: string) => { delete localStorageMock[key]; }),
+      clear: vi.fn(() => { localStorageMock = {}; }),
+    };
+    Object.defineProperty(window, 'localStorage', { value: storageMock, writable: true });
+
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [ThemeService] });
     service = TestBed.inject(ThemeService);

@@ -16,6 +16,7 @@ import { AnimatedTextComponent } from '../../../components/animated-text';
 import { ParagraphSkeletonComponent } from '../../../components/paragraph-skeleton';
 import { Topnav } from '../../../components/topnav/topnav';
 import { SidenavService } from '../../../services/sidenav/sidenav.service';
+import { BrandingService } from '../../../services/branding/branding.service';
 import { Assistant } from '../../../assistants/models/assistant.model';
 import { AssistantCardComponent } from '../../../assistants/components/assistant-card.component';
 import { AssistantIndicatorComponent } from '../assistant-indicator/assistant-indicator.component';
@@ -72,6 +73,7 @@ export interface ChatContainerConfig {
 export class ChatContainerComponent {
   // Inject sidenav service for full-page mode positioning
   protected sidenavService = inject(SidenavService);
+  protected brandingService = inject(BrandingService);
   private voiceChatService = inject(VoiceChatService);
   protected readonly isVoiceActive = this.voiceChatService.isVoiceActive;
 

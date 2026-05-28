@@ -27,7 +27,7 @@ import { FileUploadService, formatBytes } from '../../services/file-upload';
     @if (shouldShow()) {
       <div class="flex justify-center mb-2">
         <div
-          class="inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-lg border animate-fade-in bg-white dark:bg-slate-800"
+          class="inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-lg border animate-fade-in bg-white dark:bg-[var(--app-chat-input-bg)]"
           [class.border-amber-400]="severity() === 'warning'"
           [class.text-amber-700]="severity() === 'warning'"
           [class.dark:border-amber-500]="severity() === 'warning'"

@@ -78,7 +78,7 @@
     }
 
     tr:nth-child(odd) td {
-        background-color: white;
+        background-color: var(--app-chat-input-bg);
     }
 
     tr:nth-child(even) td {
@@ -223,11 +223,11 @@ html.dark .message-block {
     }
 
     tr:nth-child(odd) td {
-        background-color: var(--color-gray-900);
+        background-color: var(--app-chat-bg);
     }
 
     tr:nth-child(even) td {
-        background-color: var(--color-gray-800);
+        background-color: var(--app-chat-input-bg);
     }
 
     /* Horizontal rule */

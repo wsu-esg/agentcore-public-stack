@@ -24,7 +24,7 @@ import { heroExclamationTriangle, heroXMark } from '@ng-icons/heroicons/outline'
     @if (quotaWarningService.hasVisibleWarning()) {
       <div class="flex justify-center">
         <div
-          class="inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-t-lg border border-b-0 animate-fade-in bg-white dark:bg-slate-800"
+          class="inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-t-lg border border-b-0 animate-fade-in bg-white dark:bg-[var(--app-chat-input-bg)]"
           [class.border-amber-400]="quotaWarningService.severity() === 'warning'"
           [class.text-amber-700]="quotaWarningService.severity() === 'warning'"
           [class.dark:border-amber-500]="quotaWarningService.severity() === 'warning'"

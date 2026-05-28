@@ -44,7 +44,7 @@ import {
   host: { class: 'block' },
   template: `
     <div
-      class="approval-prompt group relative max-w-xl overflow-hidden rounded-lg border border-gray-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-slate-800/70"
+      class="approval-prompt group relative max-w-xl overflow-hidden rounded-lg border border-gray-200/80 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[color-mix(in_oklch,var(--app-chat-input-bg)_70%,transparent)]"
       role="region"
       aria-live="polite"
       [attr.aria-label]="'Approval required for tool ' + request().toolName"
@@ -57,7 +57,7 @@ import {
       <!-- Main row: matches the OAuth pill layout. -->
       <div class="flex items-center gap-2.5 py-1.5 pr-1.5 pl-3">
         <div
-          class="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-gray-50 ring-1 ring-gray-200/70 dark:bg-slate-900 dark:ring-white/10"
+          class="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-gray-50 ring-1 ring-gray-200/70 dark:bg-[var(--app-chat-bg)] dark:ring-white/10"
         >
           <ng-icon
             name="heroCommandLine"
@@ -153,7 +153,7 @@ import {
           </button>
           @if (argsExpanded()) {
             <pre
-              class="args-fold mt-1.5 max-h-72 overflow-auto rounded-md border border-gray-200/80 bg-gray-50 px-2.5 py-2 font-mono text-[11px] leading-relaxed text-gray-800 dark:border-white/10 dark:bg-slate-900/60 dark:text-gray-200"
+              class="args-fold mt-1.5 max-h-72 overflow-auto rounded-md border border-gray-200/80 bg-gray-50 px-2.5 py-2 font-mono text-[11px] leading-relaxed text-gray-800 dark:border-white/10 dark:bg-[color-mix(in_oklch,var(--app-chat-bg)_60%,transparent)] dark:text-gray-200"
             >{{ formattedInput() }}</pre>
           }
         </div>

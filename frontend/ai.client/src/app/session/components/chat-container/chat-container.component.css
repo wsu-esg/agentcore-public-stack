@@ -152,12 +152,12 @@
   right: 0;
   padding: 0.75rem 1rem;
   border-top: 1px solid var(--color-gray-200);
-  background-color: var(--color-white);
+  background-color: var(--app-chat-input-bg);
 }
 
 :host-context(html.dark) .chat-input-footer.embedded {
   border-top-color: var(--color-gray-700);
-  background-color: var(--color-gray-800);
+  background-color: var(--app-chat-input-bg);
 }
 
 /* ============================================================

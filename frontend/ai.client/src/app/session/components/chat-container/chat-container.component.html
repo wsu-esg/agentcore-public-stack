@@ -193,11 +193,11 @@
         <div class="w-full max-w-[720px] animate-fade-in px-4 -mt-20 relative">
           <div class="mb-8 flex items-center justify-center gap-4 relative" data-testid="greeting-message">
             <img
-              src="/img/logo-light.png"
+              [src]="brandingService.logoLightUrl() ?? '/img/logo-light.png'"
               alt="Logo"
               class="size-14 shrink-0 dark:hidden">
             <img
-              src="/img/logo-dark.png"
+              [src]="brandingService.logoDarkUrl() ?? '/img/logo-dark.png'"
               alt="Logo"
               class="hidden size-14 shrink-0 dark:block">
             <div>

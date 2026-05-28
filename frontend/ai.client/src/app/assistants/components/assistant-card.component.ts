@@ -84,14 +84,14 @@ import {
       position: relative;
       border-radius: 1rem;
       overflow: hidden;
-      background: white;
+      background: var(--color-secondary-50);
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 0, 0, 0.06);
       width: 100%;
       max-width: 28rem;
     }
 
     :host-context(.dark) .assistant-card {
-      background: rgb(30 41 59); /* slate-800 */
+      background: var(--color-secondary-950);
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.15);
     }
 
@@ -131,7 +131,7 @@ import {
     }
 
     :host-context(.dark) .avatar {
-      border-color: rgb(30 41 59);
+      border-color: var(--color-secondary-950);
     }
 
     .card-body {
@@ -151,29 +151,29 @@ import {
       border-radius: 0.625rem;
       font-size: 0.8125rem;
       line-height: 1.4;
-      color: rgb(55 65 81); /* gray-700 */
-      background: rgb(249 250 251); /* gray-50 */
-      border: 1px solid rgb(229 231 235); /* gray-200 */
+      color: var(--color-secondary-700);
+      background: white;
+      border: 1px solid var(--color-secondary-200);
       transition: all 150ms ease;
       cursor: pointer;
       text-align: left;
     }
 
     .starter-btn:hover {
-      background: white;
-      border-color: rgb(209 213 219); /* gray-300 */
+      background: var(--color-secondary-50);
+      border-color: var(--color-secondary-300);
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
     }
 
     :host-context(.dark) .starter-btn {
-      color: rgb(209 213 219); /* gray-300 */
-      background: rgb(30 41 59 / 0.6); /* slate-800/60 */
-      border-color: rgb(255 255 255 / 0.08);
+      color: var(--color-secondary-200);
+      background: color-mix(in oklch, var(--color-secondary-base) 20%, transparent);
+      border-color: color-mix(in oklch, var(--color-secondary-base) 30%, transparent);
     }
 
     :host-context(.dark) .starter-btn:hover {
-      background: rgb(51 65 85 / 0.8); /* slate-700/80 */
-      border-color: rgb(255 255 255 / 0.12);
+      background: color-mix(in oklch, var(--color-secondary-base) 30%, transparent);
+      border-color: color-mix(in oklch, var(--color-secondary-base) 40%, transparent);
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
     }
 

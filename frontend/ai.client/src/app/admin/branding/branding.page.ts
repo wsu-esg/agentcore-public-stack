@@ -17,6 +17,12 @@ interface BrandingResponse {
     sidebar_bg_dark?: string;
     chat_bg?: string;
     chat_bg_dark?: string;
+    text_primary?: string;
+    text_primary_dark?: string;
+    text_muted?: string;
+    text_muted_dark?: string;
+    chat_input_bg?: string;
+    chat_input_bg_dark?: string;
   };
   logo_light_url?: string;
   logo_dark_url?: string;
@@ -24,6 +30,7 @@ interface BrandingResponse {
 }
 
 type AssetType = 'logo_light' | 'logo_dark' | 'favicon';
+type ColorKey = 'primary' | 'secondary' | 'tertiary' | 'sidebar_bg' | 'sidebar_bg_dark' | 'chat_bg' | 'chat_bg_dark' | 'text_primary' | 'text_primary_dark' | 'text_muted' | 'text_muted_dark' | 'chat_input_bg' | 'chat_input_bg_dark';
 
 @Component({
   selector: 'app-branding-page',
@@ -54,7 +61,15 @@ type AssetType = 'logo_light' | 'logo_dark' | 'favicon';
                   (input)="onColorInput(swatch.key, $event)"
                   class="h-10 w-16 rounded border border-gray-300 dark:border-gray-600 cursor-pointer"
                 />
-                <span class="text-xs font-mono text-gray-500 dark:text-gray-400">{{ swatch.value }}</span>
+                <input
+                  type="text"
+                  [value]="swatch.value"
+                  (input)="onHexInput(swatch.key, $event)"
+                  maxlength="7"
+                  placeholder="#000000"
+                  class="w-24 rounded border border-gray-300 dark:border-gray-600 bg-transparent px-2 py-1 text-xs font-mono text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  aria-label="Hex colour value"
+                />
               </div>
             </div>
           }
@@ -76,7 +91,15 @@ type AssetType = 'logo_light' | 'logo_dark' | 'favicon';
                   (input)="onColorInput(swatch.key, $event)"
                   class="h-10 w-16 rounded border border-gray-300 dark:border-gray-600 cursor-pointer"
                 />
-                <span class="text-xs font-mono text-gray-500 dark:text-gray-400">{{ swatch.value }}</span>
+                <input
+                  type="text"
+                  [value]="swatch.value"
+                  (input)="onHexInput(swatch.key, $event)"
+                  maxlength="7"
+                  placeholder="#000000"
+                  class="w-24 rounded border border-gray-300 dark:border-gray-600 bg-transparent px-2 py-1 text-xs font-mono text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                  aria-label="Hex colour value"
+                />
               </div>
             </div>
           }
@@ -161,6 +184,12 @@ export class BrandingPage implements OnInit {
   readonly DEFAULT_SIDEBAR_BG_DARK = '#111827';  // gray-900
   readonly DEFAULT_CHAT_BG = '#f9fafb';          // gray-50
   readonly DEFAULT_CHAT_BG_DARK = '#111827';     // gray-900
+  readonly DEFAULT_TEXT_PRIMARY = '#111827';
+  readonly DEFAULT_TEXT_PRIMARY_DARK = '#f9fafb';
+  readonly DEFAULT_TEXT_MUTED = '#6b7280';
+  readonly DEFAULT_TEXT_MUTED_DARK = '#9ca3af';
+  readonly DEFAULT_CHAT_INPUT_BG = '#ffffff';
+  readonly DEFAULT_CHAT_INPUT_BG_DARK = '#1e293b';
 
   readonly primary = signal(this.DEFAULT_PRIMARY);
   readonly secondary = signal(this.DEFAULT_SECONDARY);
@@ -169,6 +198,12 @@ export class BrandingPage implements OnInit {
   readonly sidebarBgDark = signal(this.DEFAULT_SIDEBAR_BG_DARK);
   readonly chatBg = signal(this.DEFAULT_CHAT_BG);
   readonly chatBgDark = signal(this.DEFAULT_CHAT_BG_DARK);
+  readonly textPrimary = signal(this.DEFAULT_TEXT_PRIMARY);
+  readonly textPrimaryDark = signal(this.DEFAULT_TEXT_PRIMARY_DARK);
+  readonly textMuted = signal(this.DEFAULT_TEXT_MUTED);
+  readonly textMutedDark = signal(this.DEFAULT_TEXT_MUTED_DARK);
+  readonly chatInputBg = signal(this.DEFAULT_CHAT_INPUT_BG);
+  readonly chatInputBgDark = signal(this.DEFAULT_CHAT_INPUT_BG_DARK);
 
   readonly savingColors = signal(false);
   readonly colorsSaved = signal(false);
@@ -193,6 +228,12 @@ export class BrandingPage implements OnInit {
     { key: 'sidebar_bg_dark' as const, label: 'Sidebar / Nav (dark mode)', value: this.sidebarBgDark() },
     { key: 'chat_bg' as const, label: 'Chat frame (light mode)', value: this.chatBg() },
     { key: 'chat_bg_dark' as const, label: 'Chat frame (dark mode)', value: this.chatBgDark() },
+    { key: 'text_primary' as const, label: 'Body text (light mode)', value: this.textPrimary() },
+    { key: 'text_primary_dark' as const, label: 'Body text (dark mode)', value: this.textPrimaryDark() },
+    { key: 'text_muted' as const, label: 'Muted text (light mode)', value: this.textMuted() },
+    { key: 'text_muted_dark' as const, label: 'Muted text (dark mode)', value: this.textMutedDark() },
+    { key: 'chat_input_bg' as const, label: 'Chat input box (light mode)', value: this.chatInputBg() },
+    { key: 'chat_input_bg_dark' as const, label: 'Chat input box (dark mode)', value: this.chatInputBgDark() },
   ];
 
   readonly assetSlots = () => [
@@ -212,6 +253,12 @@ export class BrandingPage implements OnInit {
         if (cfg.colors.sidebar_bg_dark) this.sidebarBgDark.set(cfg.colors.sidebar_bg_dark);
         if (cfg.colors.chat_bg) this.chatBg.set(cfg.colors.chat_bg);
         if (cfg.colors.chat_bg_dark) this.chatBgDark.set(cfg.colors.chat_bg_dark);
+        if (cfg.colors.text_primary) this.textPrimary.set(cfg.colors.text_primary);
+        if (cfg.colors.text_primary_dark) this.textPrimaryDark.set(cfg.colors.text_primary_dark);
+        if (cfg.colors.text_muted) this.textMuted.set(cfg.colors.text_muted);
+        if (cfg.colors.text_muted_dark) this.textMutedDark.set(cfg.colors.text_muted_dark);
+        if (cfg.colors.chat_input_bg) this.chatInputBg.set(cfg.colors.chat_input_bg);
+        if (cfg.colors.chat_input_bg_dark) this.chatInputBgDark.set(cfg.colors.chat_input_bg_dark);
       }
       this.logoLightUrl.set(cfg.logo_light_url);
       this.logoDarkUrl.set(cfg.logo_dark_url);
@@ -219,18 +266,34 @@ export class BrandingPage implements OnInit {
     } catch { /* defaults remain */ }
   }
 
-  onColorInput(
-    key: 'primary' | 'secondary' | 'tertiary' | 'sidebar_bg' | 'sidebar_bg_dark' | 'chat_bg' | 'chat_bg_dark',
-    event: Event,
-  ): void {
-    const value = (event.target as HTMLInputElement).value;
+  onColorInput(key: ColorKey, event: Event): void {
+    this.setColor(key, (event.target as HTMLInputElement).value);
+  }
+
+  onHexInput(key: ColorKey, event: Event): void {
+    const raw = (event.target as HTMLInputElement).value.trim();
+    const hex = raw.startsWith('#') ? raw : `#${raw}`;
+    if (!/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(hex)) return;
+    const normalized = hex.length === 4
+      ? `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`
+      : hex.toLowerCase();
+    this.setColor(key, normalized);
+  }
+
+  private setColor(key: ColorKey, value: string): void {
     if (key === 'primary') this.primary.set(value);
     else if (key === 'secondary') this.secondary.set(value);
     else if (key === 'tertiary') this.tertiary.set(value);
     else if (key === 'sidebar_bg') this.sidebarBg.set(value);
     else if (key === 'sidebar_bg_dark') this.sidebarBgDark.set(value);
     else if (key === 'chat_bg') this.chatBg.set(value);
-    else this.chatBgDark.set(value);
+    else if (key === 'chat_bg_dark') this.chatBgDark.set(value);
+    else if (key === 'text_primary') this.textPrimary.set(value);
+    else if (key === 'text_primary_dark') this.textPrimaryDark.set(value);
+    else if (key === 'text_muted') this.textMuted.set(value);
+    else if (key === 'text_muted_dark') this.textMutedDark.set(value);
+    else if (key === 'chat_input_bg') this.chatInputBg.set(value);
+    else this.chatInputBgDark.set(value);
     this.colorsSaved.set(false);
   }
 
@@ -246,6 +309,12 @@ export class BrandingPage implements OnInit {
       sidebar_bg_dark: this.sidebarBgDark(),
       chat_bg: this.chatBg(),
       chat_bg_dark: this.chatBgDark(),
+      text_primary: this.textPrimary(),
+      text_primary_dark: this.textPrimaryDark(),
+      text_muted: this.textMuted(),
+      text_muted_dark: this.textMutedDark(),
+      chat_input_bg: this.chatInputBg(),
+      chat_input_bg_dark: this.chatInputBgDark(),
     };
     try {
       await firstValueFrom(this.http.put(this.api, { colors }));
@@ -267,6 +336,12 @@ export class BrandingPage implements OnInit {
     this.sidebarBgDark.set(this.DEFAULT_SIDEBAR_BG_DARK);
     this.chatBg.set(this.DEFAULT_CHAT_BG);
     this.chatBgDark.set(this.DEFAULT_CHAT_BG_DARK);
+    this.textPrimary.set(this.DEFAULT_TEXT_PRIMARY);
+    this.textPrimaryDark.set(this.DEFAULT_TEXT_PRIMARY_DARK);
+    this.textMuted.set(this.DEFAULT_TEXT_MUTED);
+    this.textMutedDark.set(this.DEFAULT_TEXT_MUTED_DARK);
+    this.chatInputBg.set(this.DEFAULT_CHAT_INPUT_BG);
+    this.chatInputBgDark.set(this.DEFAULT_CHAT_INPUT_BG_DARK);
     await this.saveColors();
   }
 

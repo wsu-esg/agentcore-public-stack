@@ -7,6 +7,7 @@ import { SessionService } from '../session.service';
 import { SidenavService } from '../../services/sidenav/sidenav.service';
 import { ConfigService } from '../../services/config.service';
 import { SystemService } from '../../services/system.service';
+import { BrandingService } from '../../services/branding/branding.service';
 
 interface AuthProviderPublicInfo {
   provider_id: string;
@@ -48,11 +49,11 @@ interface AuthProviderPublicListResponse {
         <!-- Logo -->
         <div class="mb-8 flex justify-center">
           <img
-            src="/img/logo-light.png"
+            [src]="brandingService.logoLightUrl() ?? '/img/logo-light.png'"
             alt="Logo"
             class="size-16 dark:hidden">
           <img
-            src="/img/logo-dark.png"
+            [src]="brandingService.logoDarkUrl() ?? '/img/logo-dark.png'"
             alt="Logo"
             class="hidden size-16 dark:block">
         </div>
@@ -166,6 +167,7 @@ export class LoginPage implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private systemService = inject(SystemService);
+  protected brandingService = inject(BrandingService);
 
   isLoading = signal(false);
   errorMessage = signal<string | null>(null);

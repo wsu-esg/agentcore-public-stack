@@ -26,6 +26,14 @@
   }
 }
 
+.chat-input-wrapper {
+  background-color: var(--app-chat-input-bg);
+}
 
+.chat-textarea {
+  color: var(--app-text-primary);
+}
 
-
+.chat-textarea::placeholder {
+  color: var(--app-text-muted);
+}

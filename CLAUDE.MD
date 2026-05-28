@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 Production-ready multi-agent conversational AI system built with AWS Bedrock AgentCore and Strands Agents.
 
 ## Build & Run
@@ -7,8 +9,10 @@ Production-ready multi-agent conversational AI system built with AWS Bedrock Age
 ### Backend
 ```bash
 cd backend
-uv sync --extra agentcore --extra dev   # All deps
-uv run python -m pytest tests/ -v       # Tests
+uv sync --extra agentcore --extra dev        # All deps
+uv run python -m pytest tests/ -v            # All tests
+uv run python -m pytest tests/agents/ -v     # Single directory
+uv run python -m pytest tests/agents/test_chat_agent.py::test_name -v  # Single test
 cd src/apis/app_api && uv run python main.py    # App API (port 8000)
 cd src/apis/inference_api && uv run python main.py  # Inference API (port 8001)
 ```
@@ -18,7 +22,8 @@ cd src/apis/inference_api && uv run python main.py  # Inference API (port 8001)
 cd frontend/ai.client
 npm install
 npm run start    # Dev server (port 4200)
-npm test         # Tests (Vitest via Analog.js)
+npm test         # Unit tests (Vitest via Analog.js)
+npm run e2e      # Playwright e2e tests
 ```
 
 ### Infrastructure
@@ -29,6 +34,19 @@ npm run build
 npx cdk synth
 npx cdk deploy --all
 ```
+
+## Version Management
+
+Single source of truth is the `VERSION` file at the repo root (`MAJOR.MINOR.PATCH[-PRERELEASE]`, no `v` prefix).
+
+```bash
+# 1. Edit VERSION file
+# 2. Sync to all manifests:
+bash scripts/common/sync-version.sh
+# 3. Commit VERSION + updated manifests
+```
+
+The sync script updates `backend/pyproject.toml`, `frontend/ai.client/package.json`, `infrastructure/package.json`, and the README version badge. PRs to `main` fail CI if VERSION is unchanged or manifests are out of sync.
 
 ## Key Conventions
 
@@ -86,6 +104,21 @@ The `inference-api` runs inside an AgentCore Runtime container. The runtime data
 **Rule:** Don't add routes to `inference-api` unless they're part of the AgentCore Runtime invocation path (i.e. the chat router that owns `/invocations` and `/ping`). User-facing CRUD-ish endpoints — even ones that share dependencies with the agent loop — belong in `app-api`. If a coding agent suggests adding endpoints to inference-api "because it has the workload context," push back: the right pattern is to mint workload context on app-api via the `AGENTCORE_RUNTIME_WORKLOAD_NAME` mint fallback in `apis/shared/oauth/agentcore_identity.py`.
 
 If you're tempted to add to inference-api because of an existing route there (`converse_router`, `voice_router`), don't use them as templates without confirming their access path — they predate this rule and may rely on bypasses (API key, WebSocket upgrade, direct container reach in environments where the runtime isn't the only path).
+
+## Angular Patterns
+
+These apply to all components in `frontend/ai.client/`:
+
+- **Do NOT set `standalone: true`** — it's the default in Angular v20+; adding it is noise
+- Use `input()` and `output()` functions instead of `@Input()`/`@Output()` decorators
+- Use `inject()` function instead of constructor injection
+- Set `changeDetection: ChangeDetectionStrategy.OnPush` on every `@Component`
+- Use `host` object inside `@Component`/`@Directive` instead of `@HostBinding`/`@HostListener`
+- Native control flow only: `@if`, `@for`, `@switch` — not `*ngIf`, `*ngFor`, `*ngSwitch`
+- `class` and `style` bindings — not `ngClass` or `ngStyle`
+- Reactive forms over template-driven forms
+- `NgOptimizedImage` for all static images (does not work for inline base64)
+- All UI must pass AXE checks and meet WCAG 2.1 AA (focus management, color contrast, ARIA)
 
 ## Debugging Quick Reference
 

@@ -39,6 +39,12 @@ async def get_branding() -> Optional[BrandingConfig]:
                 sidebar_bg_dark=item.get("sidebar_bg_dark") or None,
                 chat_bg=item.get("chat_bg") or None,
                 chat_bg_dark=item.get("chat_bg_dark") or None,
+                text_primary=item.get("text_primary") or None,
+                text_primary_dark=item.get("text_primary_dark") or None,
+                text_muted=item.get("text_muted") or None,
+                text_muted_dark=item.get("text_muted_dark") or None,
+                chat_input_bg=item.get("chat_input_bg") or None,
+                chat_input_bg_dark=item.get("chat_input_bg_dark") or None,
             )
         return BrandingConfig(
             colors=colors,
@@ -71,6 +77,18 @@ async def save_branding(config: BrandingConfig) -> None:
             item["chat_bg"] = config.colors.chat_bg
         if config.colors.chat_bg_dark is not None:
             item["chat_bg_dark"] = config.colors.chat_bg_dark
+        if config.colors.text_primary is not None:
+            item["text_primary"] = config.colors.text_primary
+        if config.colors.text_primary_dark is not None:
+            item["text_primary_dark"] = config.colors.text_primary_dark
+        if config.colors.text_muted is not None:
+            item["text_muted"] = config.colors.text_muted
+        if config.colors.text_muted_dark is not None:
+            item["text_muted_dark"] = config.colors.text_muted_dark
+        if config.colors.chat_input_bg is not None:
+            item["chat_input_bg"] = config.colors.chat_input_bg
+        if config.colors.chat_input_bg_dark is not None:
+            item["chat_input_bg_dark"] = config.colors.chat_input_bg_dark
     if config.logo_light_s3_key is not None:
         item["logo_light_s3_key"] = config.logo_light_s3_key
     if config.logo_dark_s3_key is not None:

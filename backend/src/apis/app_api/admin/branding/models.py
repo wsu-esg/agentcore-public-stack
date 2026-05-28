@@ -11,6 +11,12 @@ class BrandingColors(BaseModel):
     sidebar_bg_dark: Optional[str] = Field(None, description="Sidebar/nav background in dark mode, e.g. #111827")
     chat_bg: Optional[str] = Field(None, description="Chat frame background in light mode, e.g. #f9fafb")
     chat_bg_dark: Optional[str] = Field(None, description="Chat frame background in dark mode, e.g. #111827")
+    text_primary: Optional[str] = Field(None, description="Main text color in light mode, e.g. #111827")
+    text_primary_dark: Optional[str] = Field(None, description="Main text color in dark mode, e.g. #f9fafb")
+    text_muted: Optional[str] = Field(None, description="Muted/secondary text color in light mode, e.g. #6b7280")
+    text_muted_dark: Optional[str] = Field(None, description="Muted/secondary text color in dark mode, e.g. #9ca3af")
+    chat_input_bg: Optional[str] = Field(None, description="Chat input box background in light mode, e.g. #ffffff")
+    chat_input_bg_dark: Optional[str] = Field(None, description="Chat input box background in dark mode, e.g. #1e293b")
 
 
 class BrandingConfig(BaseModel):

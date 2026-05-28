@@ -73,7 +73,7 @@
     }
 
     th {
-        background-color: var(--color-gray-200);
+        background-color: var(--color-secondary-100);
         font-weight: 600;
     }
 
@@ -219,7 +219,7 @@ html.dark .message-block {
     }
 
     th {
-        background-color: var(--color-gray-700);
+        background-color: var(--color-secondary-900);
     }
 
     tr:nth-child(odd) td {

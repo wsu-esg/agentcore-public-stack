@@ -40,7 +40,7 @@ import { UserConnectorsService } from '../../../../../settings/connectors/servic
   host: { class: 'block' },
   template: `
     <div
-      class="oauth-prompt group relative flex max-w-xl items-center gap-2.5 overflow-hidden rounded-lg border border-gray-200/80 bg-white py-1.5 pr-1.5 pl-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-slate-800/70"
+      class="oauth-prompt group relative flex max-w-xl items-center gap-2.5 overflow-hidden rounded-lg border border-gray-200/80 bg-white py-1.5 pr-1.5 pl-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] dark:border-white/10 dark:bg-[color-mix(in_oklch,var(--app-chat-input-bg)_70%,transparent)]"
       role="region"
       aria-live="polite"
       [attr.aria-label]="'Authorization required for ' + displayName()"
@@ -51,7 +51,7 @@ import { UserConnectorsService } from '../../../../../settings/connectors/servic
       ></span>
 
       <div
-        class="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-gray-50 ring-1 ring-gray-200/70 dark:bg-slate-900 dark:ring-white/10"
+        class="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-gray-50 ring-1 ring-gray-200/70 dark:bg-[var(--app-chat-bg)] dark:ring-white/10"
       >
         @if (iconDataUrl(); as data) {
           <img

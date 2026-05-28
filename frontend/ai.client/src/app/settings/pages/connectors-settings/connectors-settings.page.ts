@@ -96,7 +96,7 @@ type ConnectState =
         <ul class="flex flex-col gap-3">
           @for (connector of connectors(); track connector.providerId) {
             <li
-              class="flex items-start justify-between gap-4 rounded-sm border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800"
+              class="flex items-start justify-between gap-4 rounded-sm border border-gray-200 bg-[var(--app-chat-input-bg)] p-4 dark:border-gray-700"
             >
               <div class="flex items-start gap-3">
                 @if (connector.iconData) {
@@ -148,7 +148,7 @@ type ConnectState =
                     <button
                       type="button"
                       (click)="disconnect(connector)"
-                      class="inline-flex items-center gap-1.5 rounded-sm border border-gray-300 bg-white px-3 py-1.5 text-sm/6 font-semibold text-gray-700 shadow-xs hover:bg-gray-50 focus:outline-hidden focus:ring-3 focus:ring-gray-300/50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                      class="inline-flex items-center gap-1.5 rounded-sm border border-gray-300 bg-[var(--app-chat-input-bg)] px-3 py-1.5 text-sm/6 font-semibold text-gray-700 shadow-xs hover:bg-gray-50 focus:outline-hidden focus:ring-3 focus:ring-gray-300/50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
                     >
                       Disconnect
                     </button>

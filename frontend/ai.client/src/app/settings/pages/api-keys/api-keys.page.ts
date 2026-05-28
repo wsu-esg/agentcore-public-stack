@@ -55,7 +55,7 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
                 <div class="rounded-sm border-2 border-dashed border-gray-200 bg-gray-50 px-4 py-3 dark:border-gray-700 dark:bg-gray-800/50">
                   <div class="mx-auto h-5 w-40 rounded-xs bg-gray-200 dark:bg-gray-700"></div>
                 </div>
-                <div class="mt-5 rounded-sm border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+                <div class="mt-5 rounded-sm border border-gray-200 bg-[var(--app-chat-input-bg)] dark:border-gray-700">
                   <div class="p-4">
                     <div class="h-5 w-32 rounded-xs bg-gray-200 dark:bg-gray-700"></div>
                     <div class="mt-2 h-4 w-24 rounded-xs bg-gray-200 dark:bg-gray-700"></div>
@@ -71,11 +71,11 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
               </div>
             } @else if (!showCreateDialog()) {
               <button (click)="handleCreateClick()"
-                class="flex items-center justify-center gap-2 rounded-sm border-2 border-dashed border-orange-300 bg-white px-4 py-3 text-sm/6 font-semibold text-orange-600 transition-colors hover:border-orange-400 hover:bg-orange-50 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:border-orange-600/40 dark:bg-gray-800 dark:text-orange-400 dark:hover:border-orange-500 dark:hover:bg-orange-950/30">
+                class="flex items-center justify-center gap-2 rounded-sm border-2 border-dashed border-orange-300 bg-[var(--app-chat-input-bg)] px-4 py-3 text-sm/6 font-semibold text-orange-600 transition-colors hover:border-orange-400 hover:bg-orange-50 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 dark:border-orange-600/40 dark:text-orange-400 dark:hover:border-orange-500 dark:hover:bg-orange-950/30">
                 <ng-icon name="heroPlus" class="size-4" /> Create New API Key
               </button>
             } @else {
-              <div class="rounded-sm border border-orange-300 bg-white p-5 shadow-sm dark:border-orange-700/50 dark:bg-gray-800">
+              <div class="rounded-sm border border-orange-300 bg-[var(--app-chat-input-bg)] p-5 shadow-sm dark:border-orange-700/50">
                 <div class="flex items-center justify-between">
                   <h3 class="text-sm/6 font-semibold text-gray-900 dark:text-white">New API Key</h3>
                   <button (click)="closeCreateDialog()" class="rounded-xs p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200" aria-label="Close">
@@ -87,7 +87,7 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
                     <input id="key-name" type="text" placeholder="Key name, e.g. my-app"
                       [value]="newKeyName()" (input)="newKeyName.set($any($event.target).value)" (keydown.enter)="createKey()"
                       [disabled]="creating()"
-                      class="block flex-1 rounded-sm border border-gray-300 bg-white px-3 py-2 text-sm/6 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 disabled:opacity-50 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500" />
+                      class="block flex-1 rounded-sm border border-gray-300 bg-[var(--app-chat-input-bg)] px-3 py-2 text-sm/6 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 disabled:opacity-50 dark:border-gray-600 dark:text-white dark:placeholder-gray-500" />
                     <button (click)="createKey()" [disabled]="!newKeyName().trim() || creating()"
                       class="inline-flex shrink-0 items-center gap-2 rounded-sm bg-orange-500 px-4 py-2 text-sm/6 font-semibold text-white transition-colors hover:bg-orange-600 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
                       @if (creating()) {
@@ -124,7 +124,7 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
             <!-- Confirm replace modal -->
             @if (showConfirmReplace()) {
               <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" (click)="showConfirmReplace.set(false)">
-                <div class="mx-4 w-full max-w-sm rounded-sm border border-gray-200 bg-white p-6 shadow-xl dark:border-gray-700 dark:bg-gray-800" (click)="$event.stopPropagation()">
+                <div class="mx-4 w-full max-w-sm rounded-sm border border-gray-200 bg-[var(--app-chat-input-bg)] p-6 shadow-xl dark:border-gray-700" (click)="$event.stopPropagation()">
                   <div class="flex items-start gap-3">
                     <div class="flex size-10 shrink-0 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30">
                       <ng-icon name="heroExclamationTriangle" class="size-5 text-orange-600 dark:text-orange-400" />
@@ -148,7 +148,7 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
             @if (loading()) {
               <!-- handled above -->
             } @else if (apiKey(); as key) {
-              <div class="rounded-sm border bg-white shadow-xs dark:bg-gray-800"
+              <div class="rounded-sm border bg-[var(--app-chat-input-bg)] shadow-xs"
                 [class]="!isExpired() ? 'border-gray-200 dark:border-gray-700' : 'border-red-200 dark:border-red-900/50'">
                 <div class="flex items-start justify-between p-4">
                   <div class="min-w-0">
@@ -187,7 +187,7 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
                 </div>
               </div>
             } @else if (!showCreateDialog()) {
-              <div class="rounded-sm border border-dashed border-gray-300 bg-white p-8 text-center dark:border-gray-700 dark:bg-gray-800">
+              <div class="rounded-sm border border-dashed border-gray-300 bg-[var(--app-chat-input-bg)] p-8 text-center dark:border-gray-700">
                 <ng-icon name="heroKey" class="mx-auto size-10 text-gray-300 dark:text-gray-600" />
                 <p class="mt-3 text-sm/6 font-medium text-gray-900 dark:text-white">No API key yet</p>
                 <p class="mt-1 text-sm/6 text-gray-500 dark:text-gray-400">Create your first key to get started with the API.</p>
@@ -195,7 +195,7 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
             }
 
             <!-- Available Models -->
-            <div class="overflow-hidden rounded-sm border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+            <div class="overflow-hidden rounded-sm border border-gray-200 bg-[var(--app-chat-input-bg)] dark:border-gray-700">
               <button (click)="modelsExpanded.set(!modelsExpanded())"
                 class="flex w-full items-center justify-between p-4 text-left focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                 [attr.aria-expanded]="modelsExpanded()">
@@ -241,7 +241,7 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
             </div>
 
             <!-- Important Information -->
-            <div class="overflow-hidden rounded-sm border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
+            <div class="overflow-hidden rounded-sm border border-gray-200 bg-[var(--app-chat-input-bg)] dark:border-gray-700">
               <button (click)="infoExpanded.set(!infoExpanded())"
                 class="flex w-full items-center justify-between p-4 text-left focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                 [attr.aria-expanded]="infoExpanded()">
@@ -283,7 +283,7 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
 
           <!-- RIGHT COLUMN -->
           <div class="flex flex-col gap-5">
-            <div class="rounded-sm border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
+            <div class="rounded-sm border border-gray-200 bg-[var(--app-chat-input-bg)] p-5 dark:border-gray-700">
               <p class="text-xs/5 font-semibold uppercase tracking-wider text-orange-500 dark:text-orange-400">Interactive examples with your available models</p>
               <div class="mt-2 flex items-center gap-3">
                 <ng-icon name="heroCodeBracket" class="size-6 text-orange-500" />
@@ -293,7 +293,7 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
                 <div>
                   <label for="model-select" class="block text-xs/5 font-medium text-gray-500 dark:text-gray-400">Select Model</label>
                   <select id="model-select" (change)="selectedModelId.set($any($event.target).value)"
-                    class="mt-1 block w-full rounded-sm border border-gray-300 bg-white px-3 py-2 text-sm/6 text-gray-900 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                    class="mt-1 block w-full rounded-sm border border-gray-300 bg-[var(--app-chat-input-bg)] px-3 py-2 text-sm/6 text-gray-900 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:border-gray-600 dark:text-white">
                     @for (model of availableModels(); track model.id) {
                       <option [value]="model.modelId" [selected]="model.modelId === selectedModelId()">{{ model.modelName }} ({{ model.modelId }})</option>
                     }
@@ -311,7 +311,7 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
                         <ng-icon name="heroQuestionMarkCircle" class="size-3.5" />
                       </button>
                       @if (activeTooltip() === 'responseType') {
-                        <div class="absolute bottom-full left-1/2 z-10 mb-2 w-64 -translate-x-1/2 rounded-sm border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-600 dark:bg-gray-800" role="tooltip">
+                        <div class="absolute bottom-full left-1/2 z-10 mb-2 w-64 -translate-x-1/2 rounded-sm border border-gray-200 bg-[var(--app-chat-input-bg)] p-3 shadow-lg dark:border-gray-600" role="tooltip">
                           <p class="text-xs/5 font-semibold text-gray-900 dark:text-white">Non-Streaming</p>
                           <p class="text-xs/4 text-gray-600 dark:text-gray-300">Returns the complete response at once as JSON. Best for batch processing and simple integrations.</p>
                           <p class="mt-2 text-xs/5 font-semibold text-gray-900 dark:text-white">Streaming (SSE)</p>
@@ -322,7 +322,7 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
                     </div>
                   </div>
                   <select id="response-type" (change)="selectedResponseType.set($any($event.target).value)"
-                    class="mt-1 block w-full rounded-sm border border-gray-300 bg-white px-3 py-2 text-sm/6 text-gray-900 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                    class="mt-1 block w-full rounded-sm border border-gray-300 bg-[var(--app-chat-input-bg)] px-3 py-2 text-sm/6 text-gray-900 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:border-gray-600 dark:text-white">
                     <option value="non-streaming" [selected]="selectedResponseType() === 'non-streaming'">Non-Streaming (Complete)</option>
                     <option value="streaming" [selected]="selectedResponseType() === 'streaming'">Streaming (SSE)</option>
                   </select>
@@ -339,7 +339,7 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
                         <ng-icon name="heroQuestionMarkCircle" class="size-3.5" />
                       </button>
                       @if (activeTooltip() === 'exampleFormat') {
-                        <div class="absolute bottom-full left-1/2 z-10 mb-2 w-64 -translate-x-1/2 rounded-sm border border-gray-200 bg-white p-3 shadow-lg dark:border-gray-600 dark:bg-gray-800" role="tooltip">
+                        <div class="absolute bottom-full left-1/2 z-10 mb-2 w-64 -translate-x-1/2 rounded-sm border border-gray-200 bg-[var(--app-chat-input-bg)] p-3 shadow-lg dark:border-gray-600" role="tooltip">
                           <p class="text-xs/5 font-semibold text-gray-900 dark:text-white">Simple Message</p>
                           <p class="text-xs/4 text-gray-600 dark:text-gray-300">Single message without history. Perfect for one-off Q&A requests.</p>
                           <p class="mt-2 text-xs/5 font-semibold text-gray-900 dark:text-white">Conversation History</p>
@@ -350,7 +350,7 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
                     </div>
                   </div>
                   <select id="example-format" (change)="selectedFormat.set($any($event.target).value)"
-                    class="mt-1 block w-full rounded-sm border border-gray-300 bg-white px-3 py-2 text-sm/6 text-gray-900 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-white">
+                    class="mt-1 block w-full rounded-sm border border-gray-300 bg-[var(--app-chat-input-bg)] px-3 py-2 text-sm/6 text-gray-900 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:border-gray-600 dark:text-white">
                     <option value="simple" [selected]="selectedFormat() === 'simple'">Simple Message</option>
                     <option value="conversation" [selected]="selectedFormat() === 'conversation'">Conversation History</option>
                   </select>
@@ -374,14 +374,14 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
                           <label for="param-temperature" class="block text-xs/5 font-medium text-gray-500 dark:text-gray-400">Temperature</label>
                           <input id="param-temperature" type="text" placeholder="0.7"
                             [value]="paramTemperature()" (input)="paramTemperature.set($any($event.target).value)"
-                            class="mt-1 block w-full rounded-sm border border-gray-300 bg-white px-3 py-1.5 font-mono text-sm/6 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500" />
+                            class="mt-1 block w-full rounded-sm border border-gray-300 bg-[var(--app-chat-input-bg)] px-3 py-1.5 font-mono text-sm/6 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:border-gray-600 dark:text-white dark:placeholder-gray-500" />
                           <p class="mt-0.5 text-xs/4 text-gray-400 dark:text-gray-500">0.0 – 1.0</p>
                         </div>
                         <div>
                           <label for="param-max-tokens" class="block text-xs/5 font-medium text-gray-500 dark:text-gray-400">Max Tokens</label>
                           <input id="param-max-tokens" type="text" placeholder="4096"
                             [value]="paramMaxTokens()" (input)="paramMaxTokens.set($any($event.target).value)"
-                            class="mt-1 block w-full rounded-sm border border-gray-300 bg-white px-3 py-1.5 font-mono text-sm/6 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500" />
+                            class="mt-1 block w-full rounded-sm border border-gray-300 bg-[var(--app-chat-input-bg)] px-3 py-1.5 font-mono text-sm/6 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:border-gray-600 dark:text-white dark:placeholder-gray-500" />
                           <p class="mt-0.5 text-xs/4 text-gray-400 dark:text-gray-500">1 – model max</p>
                         </div>
                       </div>
@@ -389,14 +389,14 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
                         <label for="param-top-p" class="block text-xs/5 font-medium text-gray-500 dark:text-gray-400">Top P</label>
                         <input id="param-top-p" type="text" placeholder="(default)"
                           [value]="paramTopP()" (input)="paramTopP.set($any($event.target).value)"
-                          class="mt-1 block w-full rounded-sm border border-gray-300 bg-white px-3 py-1.5 font-mono text-sm/6 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500" />
+                          class="mt-1 block w-full rounded-sm border border-gray-300 bg-[var(--app-chat-input-bg)] px-3 py-1.5 font-mono text-sm/6 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:border-gray-600 dark:text-white dark:placeholder-gray-500" />
                         <p class="mt-0.5 text-xs/4 text-gray-400 dark:text-gray-500">Nucleus sampling, 0.0 – 1.0</p>
                       </div>
                       <div>
                         <label for="param-system-prompt" class="block text-xs/5 font-medium text-gray-500 dark:text-gray-400">System Prompt</label>
                         <textarea id="param-system-prompt" rows="2" placeholder="(none)"
                           [value]="paramSystemPrompt()" (input)="paramSystemPrompt.set($any($event.target).value)"
-                          class="mt-1 block w-full resize-y rounded-sm border border-gray-300 bg-white px-3 py-1.5 text-sm/6 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:border-gray-600 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500"></textarea>
+                          class="mt-1 block w-full resize-y rounded-sm border border-gray-300 bg-[var(--app-chat-input-bg)] px-3 py-1.5 text-sm/6 text-gray-900 placeholder-gray-400 focus:border-orange-500 focus:outline-hidden focus:ring-2 focus:ring-orange-500/30 dark:border-gray-600 dark:text-white dark:placeholder-gray-500"></textarea>
                         <p class="mt-0.5 text-xs/4 text-gray-400 dark:text-gray-500">Instructions for the model's behavior</p>
                       </div>
                     </div>
@@ -407,7 +407,7 @@ type TooltipField = 'responseType' | 'exampleFormat' | 'optionalParams' | null;
 
             <!-- Code examples -->
             <div class="flex flex-col gap-3">
-              <div class="flex gap-1 rounded-sm border border-gray-200 bg-white p-1 dark:border-gray-700 dark:bg-gray-800">
+              <div class="flex gap-1 rounded-sm border border-gray-200 bg-[var(--app-chat-input-bg)] p-1 dark:border-gray-700">
                 @for (lang of languages; track lang.id) {
                   <button (click)="selectedLanguage.set(lang.id)"
                     [class]="selectedLanguage() === lang.id

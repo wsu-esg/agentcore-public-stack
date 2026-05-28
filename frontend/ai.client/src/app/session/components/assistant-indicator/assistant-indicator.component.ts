@@ -166,7 +166,7 @@ import {
 
     /* Dark mode */
     :host-context(html.dark) .assistant-indicator {
-      background: rgb(30 41 59); /* slate-800 */
+      background: var(--app-chat-input-bg); /* slate-800 */
       border-color: rgba(255, 255, 255, 0.1);
       box-shadow:
         0 1px 3px rgba(0, 0, 0, 0.2),
@@ -258,7 +258,7 @@ import {
     }
 
     :host-context(html.dark) .indicator-menu {
-      background: rgb(30 41 59);
+      background: var(--app-chat-input-bg);
       border-color: rgba(255, 255, 255, 0.1);
       box-shadow:
         0 4px 16px rgba(0, 0, 0, 0.3),

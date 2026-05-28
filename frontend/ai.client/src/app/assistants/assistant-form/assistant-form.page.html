@@ -1,8 +1,8 @@
 <!-- Fixed full-screen layout (sidenav always hidden on this page) -->
-<div class="fixed inset-0 flex flex-col bg-white dark:bg-gray-900">
+<div class="fixed inset-0 flex flex-col bg-[var(--app-chat-bg)]">
 
   <!-- Header with breadcrumbs and actions -->
-  <header class="shrink-0 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+  <header class="shrink-0 border-b border-gray-200 dark:border-gray-700 bg-[var(--app-chat-input-bg)]">
     <div class="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-4">
       <!-- Left: Breadcrumbs and Status -->
       <div class="flex items-center gap-4">
@@ -72,7 +72,7 @@
                   cdkOverlayOrigin
                   #emojiTrigger="cdkOverlayOrigin"
                   (click)="toggleEmojiPicker()"
-                  class="flex size-10 items-center justify-center rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xl"
+                  class="flex size-10 items-center justify-center rounded-md border border-gray-300 dark:border-gray-600 bg-[var(--app-chat-input-bg)] hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xl"
                 >
                   @if (form.get('emoji')?.value) {
                     <span>{{ form.get('emoji')?.value }}</span>
@@ -92,7 +92,7 @@
                   (detach)="closeEmojiPicker()"
                 >
                   <div class="rounded-lg shadow-lg ring-1 ring-black/5 dark:ring-white/10 overflow-hidden">
-                    <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                    <div class="flex items-center justify-between px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-[var(--app-chat-input-bg)]">
                       <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Select Emoji</span>
                       <button
                         type="button"
@@ -132,7 +132,7 @@
                 type="text"
                 id="name"
                 formControlName="name"
-                class="block w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100"
+                class="block w-full px-3 py-2 bg-[var(--app-chat-input-bg)] border rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100"
                 [class.border-red-500]="form.get('name')?.touched && form.get('name')?.invalid"
                 [class.border-gray-300]="!form.get('name')?.touched || form.get('name')?.valid"
                 [class.dark:border-red-500]="form.get('name')?.touched && form.get('name')?.invalid"
@@ -154,7 +154,7 @@
               id="description"
               formControlName="description"
               rows="3"
-              class="block w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100"
+              class="block w-full px-3 py-2 bg-[var(--app-chat-input-bg)] border rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100"
               [class.border-red-500]="form.get('description')?.touched && form.get('description')?.invalid"
               [class.border-gray-300]="!form.get('description')?.touched || form.get('description')?.valid"
               [class.dark:border-red-500]="form.get('description')?.touched && form.get('description')?.invalid"
@@ -175,7 +175,7 @@
               id="instructions"
               formControlName="instructions"
               rows="8"
-              class="block w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100"
+              class="block w-full px-3 py-2 bg-[var(--app-chat-input-bg)] border rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100"
               [class.border-red-500]="form.get('instructions')?.touched && form.get('instructions')?.invalid"
               [class.border-gray-300]="!form.get('instructions')?.touched || form.get('instructions')?.valid"
               [class.dark:border-red-500]="form.get('instructions')?.touched && form.get('instructions')?.invalid"
@@ -221,7 +221,7 @@
                       <input
                         type="text"
                         [formControlName]="i"
-                        class="block w-full px-3 py-2 bg-white dark:bg-gray-800 border rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100"
+                        class="block w-full px-3 py-2 bg-[var(--app-chat-input-bg)] border rounded-md shadow-xs focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 dark:text-gray-100"
                         [class.border-red-500]="starter.touched && starter.invalid"
                         [class.border-gray-300]="!starter.touched || starter.valid"
                         [class.dark:border-red-500]="starter.touched && starter.invalid"
@@ -277,7 +277,7 @@
 
           <!-- Upload Progress -->
           @if (currentUpload(); as upload) {
-            <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+            <div class="rounded-lg border border-gray-200 dark:border-gray-700 bg-[var(--app-chat-input-bg)] p-4">
               <div class="flex items-center justify-between mb-2">
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                   <svg class="size-5 text-gray-400 dark:text-gray-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -315,7 +315,7 @@
           @if (isLoadingDocuments()) {
             <div>
               <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Uploaded Documents</h3>
-              <div class="flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-8">
+              <div class="flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 bg-[var(--app-chat-input-bg)] p-8">
                 <div class="flex flex-col items-center gap-3">
                   <svg class="size-8 text-blue-600 dark:text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -330,7 +330,7 @@
               <h3 class="text-sm font-medium text-gray-900 dark:text-gray-100 mb-3">Uploaded Documents</h3>
               <div class="space-y-2">
                 @for (doc of uploadedDocuments(); track doc.documentId) {
-                  <div class="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3">
+                  <div class="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 bg-[var(--app-chat-input-bg)] p-3">
                     <div class="flex items-center gap-3 min-w-0 flex-1">
                       @if (doc.status === 'complete') {
                         <svg class="size-5 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
@@ -401,7 +401,7 @@
     </div>
 
     <!-- Right Column: Preview Chat (hidden on mobile, independently scrollable) -->
-    <div class="hidden lg:flex lg:flex-col flex-1 min-h-0 bg-gray-50 dark:bg-gray-900">
+    <div class="hidden lg:flex lg:flex-col flex-1 min-h-0 bg-[var(--app-chat-bg)]">
       <app-assistant-preview
         [assistantId]="assistantId()"
         [name]="liveFormName()"

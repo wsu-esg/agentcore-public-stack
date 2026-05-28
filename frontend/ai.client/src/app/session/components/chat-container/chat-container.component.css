@@ -77,6 +77,7 @@
   padding-top: 3rem; /* Clear the fixed header (4rem) + small gap */
   padding-bottom: 7.5rem; /* Space for fixed input */
   min-width: 0;
+  background-color: var(--app-chat-bg);
 }
 
 /* Assistant indicator wrapper - positioned above chat input */
@@ -142,6 +143,7 @@
   padding: 1rem;
   padding-bottom: 5rem; /* Space for the fixed input */
   min-width: 0;
+  background-color: var(--app-chat-bg);
 }
 
 /* Chat input footer for embedded mode - absolutely positioned at bottom */

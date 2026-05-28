@@ -11,6 +11,12 @@ export interface BrandingColors {
   sidebar_bg_dark?: string;
   chat_bg?: string;
   chat_bg_dark?: string;
+  text_primary?: string;
+  text_primary_dark?: string;
+  text_muted?: string;
+  text_muted_dark?: string;
+  chat_input_bg?: string;
+  chat_input_bg_dark?: string;
 }
 
 export interface BrandingConfig {
@@ -91,11 +97,17 @@ export class BrandingService {
         --app-sidebar-bg: ${colors.sidebar_bg ?? '#f3f4f6'};
         --app-topbar-bg: ${colors.sidebar_bg ?? '#f9fafb'};
         --app-chat-bg: ${colors.chat_bg ?? '#f9fafb'};
+        --app-text-primary: ${colors.text_primary ?? '#111827'};
+        --app-text-muted: ${colors.text_muted ?? '#6b7280'};
+        --app-chat-input-bg: ${colors.chat_input_bg ?? '#ffffff'};
       }
       html.dark {
         --app-sidebar-bg: ${colors.sidebar_bg_dark ?? '#111827'};
         --app-topbar-bg: ${colors.sidebar_bg_dark ?? '#111827'};
         --app-chat-bg: ${colors.chat_bg_dark ?? '#111827'};
+        --app-text-primary: ${colors.text_primary_dark ?? '#f9fafb'};
+        --app-text-muted: ${colors.text_muted_dark ?? '#9ca3af'};
+        --app-chat-input-bg: ${colors.chat_input_bg_dark ?? '#1e293b'};
       }
     `;
   }

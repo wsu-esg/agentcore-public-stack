@@ -7,6 +7,7 @@ import { SessionService as BffSessionService } from '../../auth/session.service'
 import { UserDropdownComponent } from '../topnav/components/user-dropdown.component';
 import { SidenavService } from '../../services/sidenav/sidenav.service';
 import { TooltipDirective } from '../tooltip/tooltip.directive';
+import { BrandingService } from '../../services/branding/branding.service';
 
 @Component({
   selector: 'app-sidenav',
@@ -20,6 +21,7 @@ export class Sidenav {
   private bffSession = inject(BffSessionService);
   protected sidenavService = inject(SidenavService);
   protected userService = inject(UserService);
+  protected brandingService = inject(BrandingService);
 
   // Access to current session signals - available for use in template or component logic
   readonly currentSession = this.sessionService.currentSession;

@@ -286,12 +286,18 @@ html.dark body {
     --app-sidebar-bg: #f3f4f6;  /* gray-100 — sidenav background (light mode) */
     --app-topbar-bg:  #f9fafb;  /* gray-50  — topbar background (light mode) */
     --app-chat-bg:    #f9fafb;  /* gray-50  — chat frame background (light mode) */
+    --app-text-primary: #111827;   /* gray-900 — primary body text (light mode) */
+    --app-text-muted: #6b7280;     /* gray-500 — muted/secondary text (light mode) */
+    --app-chat-input-bg: #ffffff;  /* white — chat input box background (light mode) */
 }
 
 html.dark {
     --app-sidebar-bg: #111827;  /* gray-900 — sidenav background (dark mode) */
     --app-topbar-bg:  #111827;  /* gray-900 — topbar background (dark mode) */
     --app-chat-bg:    #111827;  /* gray-900 — chat frame background (dark mode) */
+    --app-text-primary: #f9fafb;   /* gray-50 — primary body text (dark mode) */
+    --app-text-muted: #9ca3af;     /* gray-400 — muted/secondary text (dark mode) */
+    --app-chat-input-bg: #1e293b;  /* slate-800 — chat input box background (dark mode) */
 }
 
 @theme {

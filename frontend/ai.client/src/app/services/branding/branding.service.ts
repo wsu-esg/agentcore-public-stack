@@ -114,14 +114,17 @@ export class BrandingService {
 
   private _applyFavicon(url: string | undefined): void {
     if (!url) return;
-    const link: HTMLLinkElement =
-      document.querySelector("link[rel~='icon']") ??
-      (() => {
-        const el = document.createElement('link');
-        el.rel = 'icon';
-        document.head.appendChild(el);
-        return el;
-      })();
-    link.href = url;
+    // Update every existing favicon link (32x32, 16x16, apple-touch-icon, etc.)
+    const existing = document.querySelectorAll<HTMLLinkElement>(
+      "link[rel~='icon'], link[rel='apple-touch-icon']"
+    );
+    if (existing.length > 0) {
+      existing.forEach(el => { el.href = url; });
+    } else {
+      const el = document.createElement('link');
+      el.rel = 'icon';
+      document.head.appendChild(el);
+      el.href = url;
+    }
   }
 }

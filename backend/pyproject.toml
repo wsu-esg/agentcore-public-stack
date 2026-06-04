@@ -39,7 +39,7 @@ dependencies = [
     "pillow==12.2.0",
     "cryptography==47.0.0",
     "python-multipart==0.0.27",
-    "aiohttp==3.13.5",
+    "aiohttp==3.14.0",
 
     # PDF page-1 rasterization for attachment thumbnails (Apache 2.0 / BSD).
     # Bundles PDFium (no system poppler/ghostscript needed).
